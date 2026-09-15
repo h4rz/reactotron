@@ -48,11 +48,6 @@ const validationResults = []
 for (const workspacePath of workspacePaths) {
   const workspaceName = path.basename(workspacePath)
   const errors = []
-  const releaseWorkspace = workspaceName === "reactotron-cli" || workspaceName === "reactotron-react-native"
-  const repositoryRoot = releaseWorkspace
-    ? "https://github.com/h4rz/reactotron"
-    : "https://github.com/hurajgor/reactotron"
-  const repositoryBranch = releaseWorkspace ? "development" : "master"
 
   console.log(`🔍 Validating "${workspaceName}"...`)
 
@@ -82,6 +77,11 @@ for (const workspacePath of workspacePaths) {
   // #endregion
 
   // #region Validate package.json
+  const scopedPackage = packageJson.name.startsWith("@hurajgor/")
+  const repositoryRoot = scopedPackage
+    ? "https://github.com/h4rz/reactotron"
+    : "https://github.com/hurajgor/reactotron"
+  const repositoryBranch = scopedPackage ? "development" : "master"
 
   // assert "author" field is Infinite Red
   if (packageJson.author !== "Infinite Red") {

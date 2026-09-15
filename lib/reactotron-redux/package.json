@@ -5,10 +5,10 @@
   "author": "Infinite Red",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/hurajgor/reactotron/issues"
+    "url": "https://github.com/h4rz/reactotron/issues"
   },
-  "homepage": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-redux",
-  "repository": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-redux",
+  "homepage": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-redux",
+  "repository": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-redux",
   "files": [
     "dist",
     "src"

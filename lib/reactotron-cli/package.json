@@ -4,10 +4,10 @@
   "description": "Agent-friendly command line interface for Reactotron.",
   "author": "Infinite Red",
   "license": "MIT",
-  "repository": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-cli",
-  "homepage": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-cli",
+  "repository": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-cli",
+  "homepage": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-cli",
   "bugs": {
-    "url": "https://github.com/hurajgor/reactotron/issues"
+    "url": "https://github.com/h4rz/reactotron/issues"
   },
   "files": [
     "dist",

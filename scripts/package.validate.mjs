@@ -48,6 +48,11 @@ const validationResults = []
 for (const workspacePath of workspacePaths) {
   const workspaceName = path.basename(workspacePath)
   const errors = []
+  const releaseWorkspace = workspaceName === "reactotron-cli" || workspaceName === "reactotron-react-native"
+  const repositoryRoot = releaseWorkspace
+    ? "https://github.com/h4rz/reactotron"
+    : "https://github.com/hurajgor/reactotron"
+  const repositoryBranch = releaseWorkspace ? "development" : "master"
 
   console.log(`🔍 Validating "${workspaceName}"...`)
 
@@ -88,23 +93,23 @@ for (const workspacePath of workspacePaths) {
     errors.push(`Invalid license field: "${packageJson.license}" (expected "MIT")`)
   }
 
-  // assert "bugs.url" field is "https://github.com/hurajgor/reactotron/issues"
-  if (packageJson.bugs?.url !== "https://github.com/hurajgor/reactotron/issues") {
+  // assert "bugs.url" points to the expected repository
+  if (packageJson.bugs?.url !== `${repositoryRoot}/issues`) {
     errors.push(
-      `Invalid bugs.url field: "${packageJson.bugs?.url}" (expected "https://github.com/hurajgor/reactotron/issues")`
+      `Invalid bugs.url field: "${packageJson.bugs?.url}" (expected "${repositoryRoot}/issues")`
     )
   }
 
-  // assert "homepage" field is `https://github.com/hurajgor/reactotron/tree/master/lib/${workspaceName}`
-  const expectedHomepage = `https://github.com/hurajgor/reactotron/tree/master/lib/${workspaceName}`
+  // assert "homepage" points to the expected workspace
+  const expectedHomepage = `${repositoryRoot}/tree/${repositoryBranch}/lib/${workspaceName}`
   if (packageJson.homepage !== expectedHomepage) {
     errors.push(
       `Invalid homepage field: "${packageJson.homepage}" (expected "${expectedHomepage}")`
     )
   }
 
-  // assert "repository" field is `https://github.com/hurajgor/reactotron/tree/master/lib/${workspaceName}`
-  const expectedRepository = `https://github.com/hurajgor/reactotron/tree/master/lib/${workspaceName}`
+  // assert "repository" points to the expected workspace
+  const expectedRepository = `${repositoryRoot}/tree/${repositoryBranch}/lib/${workspaceName}`
   if (packageJson.repository !== expectedRepository) {
     errors.push(
       `Invalid repository field: "${packageJson.repository}" (expected "${expectedRepository}")`

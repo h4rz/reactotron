@@ -2,6 +2,16 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [3.14.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.13.2...reactotron-app@3.14.0) (2026-09-11)
+
+### Features
+
+* **agent:** add CLI and retire desktop agent page ([f3b06e4](https://github.com/hurajgor/reactotron/commit/f3b06e4d48787d0c767dece3114e945279faaca9))
+
+### Bug Fixes
+
+* **reactotron-app:** improve simulator surface lifecycle ([1df4f2a](https://github.com/hurajgor/reactotron/commit/1df4f2a758f0236f2d134245e05ea6f431017db4))
+
 ## [3.13.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.12.2...reactotron-app@3.13.0) (2026-07-22)
 
 

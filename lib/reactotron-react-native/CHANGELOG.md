@@ -2,6 +2,12 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [5.3.6](https://github.com/hurajgor/reactotron/compare/reactotron-react-native@5.3.5...reactotron-react-native@5.3.6) (2026-09-11)
+
+### Bug Fixes
+
+* **agent runtime:** tolerate incompatible DevTools renderers and guarded scroll refs ([f3b06e4](https://github.com/hurajgor/reactotron/commit/f3b06e4d48787d0c767dece3114e945279faaca9))
+
 ## [5.3.0](https://github.com/infinitered/reactotron/compare/@hurajgor/reactotron-react-native@5.2.0...@hurajgor/reactotron-react-native@5.3.0) (2026-07-14)
 
 ### Features

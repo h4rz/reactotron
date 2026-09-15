@@ -1,4 +1,4 @@
-# reactotron (hurajgor fork)
+# reactotron (fork)
 
 A fork of [`infinitered/reactotron`](https://github.com/infinitered/reactotron), publishing the
 libraries under the **`@hurajgor`** npm scope and shipping its own signed macOS build of the

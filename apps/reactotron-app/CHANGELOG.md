@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.1](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.0...reactotron-app@3.14.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** restore Xcode 27 simulator streaming ([a47da2b](https://github.com/hurajgor/reactotron/commit/a47da2b7f46e280637e30c2e22a98024f7295444))
+
 ## [3.14.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.13.2...reactotron-app@3.14.0) (2026-09-11)
 
 ### Features

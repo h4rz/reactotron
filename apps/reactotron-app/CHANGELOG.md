@@ -2,6 +2,19 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.3](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.2...reactotron-app@3.14.3) (2026-09-17)
+
+
+### Features
+
+* **app:** add Ocean and Iris themes ([6ee56b6](https://github.com/hurajgor/reactotron/commit/6ee56b6b25d37515f6b0fa42d318084242b2067d))
+* **app:** redesign appearance and typography settings ([caac208](https://github.com/hurajgor/reactotron/commit/caac20880857ae2fe24fcb2f1b0e8930147efc79))
+
+
+### Bug Fixes
+
+* **app:** restore cross-platform desktop builds ([9171eb1](https://github.com/hurajgor/reactotron/commit/9171eb1b917fbadf0058bfcf3668bf481eb56f3d))
+
 ### [3.14.2](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.1...reactotron-app@3.14.2) (2026-09-17)
 
 

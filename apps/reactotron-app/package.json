@@ -169,7 +169,7 @@
     "win": {
       "icon": "./icon.png",
       "files": [
-        "!node_modules/serve-sim/**"
+        "!**/node_modules/serve-sim{,/**}"
       ],
       "target": [
         "nsis",
@@ -178,7 +178,7 @@
     },
     "linux": {
       "files": [
-        "!node_modules/serve-sim/**"
+        "!**/node_modules/serve-sim{,/**}"
       ],
       "target": [
         "deb",

@@ -71,4 +71,26 @@ const $ = (cmd) => {
 }
 
 console.log(`Building app with flags: '${flags}'...`)
-$(`yarn build && electron-builder ${flags}`)
+$(`yarn build`)
+
+// electron-builder follows the production dependency graph independently of
+// platform-specific file globs. Remove serve-sim from that graph while
+// packaging Windows and Linux so its macOS native binaries cannot leak into
+// either app. The source manifest is restored even when packaging fails.
+let restorePackageJson = () => {}
+if (BUILD_TARGET !== "macos") {
+  const fs = require("fs")
+  const path = require("path")
+  const packageJsonPath = path.join(__dirname, "..", "package.json")
+  const originalPackageJson = fs.readFileSync(packageJsonPath, "utf8")
+  const packageJson = JSON.parse(originalPackageJson)
+  delete packageJson.dependencies?.["serve-sim"]
+  fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`)
+  restorePackageJson = () => fs.writeFileSync(packageJsonPath, originalPackageJson)
+}
+
+try {
+  $(`electron-builder ${flags}`)
+} finally {
+  restorePackageJson()
+}

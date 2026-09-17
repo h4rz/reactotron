@@ -16,6 +16,7 @@ import {
 } from "react-icons/md"
 import styled from "styled-components"
 
+import { getDesktopShortcutModifier, isIOSSimulatorSupported } from "../../../platform"
 import {
   fitDeviceFrameToPane,
   mapPointToStream,
@@ -69,6 +70,8 @@ const PREVIEW_RETRY_DELAY = 1000
 const PREVIEW_RETRY_LIMIT = 4
 const IOS_DECODE_QUEUE_LIMIT = 8
 const IOS_FRAME_DURATION_MICROSECONDS = 16_667
+const supportsIOSSimulator = isIOSSimulatorSupported(window.process.platform)
+const shortcutModifier = getDesktopShortcutModifier(window.process.platform)
 
 const Panel = styled.aside<{ $isOpen: boolean; $isResizing: boolean; $width: number }>`
   display: flex;
@@ -1145,8 +1148,10 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   }, [])
 
   useEffect(() => {
-    loadSimulators().catch(() => undefined)
-    loadCreationOptions().catch(() => undefined)
+    if (supportsIOSSimulator) {
+      loadSimulators().catch(() => undefined)
+      loadCreationOptions().catch(() => undefined)
+    }
     loadAndroidDevices().catch(() => undefined)
   }, [loadAndroidDevices, loadCreationOptions, loadSimulators])
 
@@ -1264,7 +1269,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setIsAndroidRecording(Boolean(result.recording))
     setStatus(
       result.recording
-        ? "Recording Android video. Press Cmd+R or the red button to stop."
+        ? `Recording Android video. Press ${shortcutModifier}+R or the red button to stop.`
         : result.canceled
           ? "Recording discarded."
           : `Saved recording to ${result.filePath}.`
@@ -1574,7 +1579,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     )
     setStatus(
       result.recording
-        ? "Recording simulator video. Press Cmd+R or the red button to stop."
+        ? `Recording simulator video. Press ${shortcutModifier}+R or the red button to stop.`
         : result.canceled
           ? "Recording discarded."
           : `Saved recording to ${result.filePath}.`
@@ -1955,7 +1960,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   </IconButton>
                   <IconButton
                     type="button"
-                    title="Screenshot: copy or save (Cmd+S)"
+                    title={`Screenshot: copy or save (${shortcutModifier}+S)`}
                     onClick={() => takeScreenshot().catch(() => undefined)}
                   >
                     <MdScreenshot size={18} />
@@ -1965,8 +1970,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     type="button"
                     title={
                       activeSurface.recording
-                        ? "Stop recording and choose where to save (Cmd+R)"
-                        : "Start screen recording (Cmd+R)"
+                        ? `Stop recording and choose where to save (${shortcutModifier}+R)`
+                        : `Start screen recording (${shortcutModifier}+R)`
                     }
                     onClick={() => toggleRecording().catch(() => undefined)}
                   >
@@ -2066,7 +2071,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   </IconButton>
                   <IconButton
                     type="button"
-                    title="Screenshot: copy or save (Cmd+S)"
+                    title={`Screenshot: copy or save (${shortcutModifier}+S)`}
                     onClick={() => takeAndroidScreenshot().catch(() => undefined)}
                   >
                     <MdScreenshot size={18} />
@@ -2076,8 +2081,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     type="button"
                     title={
                       isAndroidRecording
-                        ? "Stop recording and choose where to save (Cmd+R)"
-                        : "Start screen recording (Cmd+R)"
+                        ? `Stop recording and choose where to save (${shortcutModifier}+R)`
+                        : `Start screen recording (${shortcutModifier}+R)`
                     }
                     onClick={() => toggleAndroidRecording().catch(() => undefined)}
                   >
@@ -2132,62 +2137,70 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
             <EmptyState>
               <EmptyIcon size={34} />
               <EmptyTitle>Open a surface</EmptyTitle>
-              <EmptyCopy>Attach a booted simulator or create a new one.</EmptyCopy>
+              <EmptyCopy>
+                {supportsIOSSimulator
+                  ? "Attach a booted simulator, create one, or connect an Android device."
+                  : "Connect an Android emulator or physical device with ADB."}
+              </EmptyCopy>
               <ActionStack>
-                <ActionSection>
-                  <ActionLabel>Available simulators</ActionLabel>
-                  <DeviceSelect
-                    aria-label="Available iOS simulators"
-                    value={selectedUdid}
-                    disabled={isLoading || simulators.length === 0}
-                    onChange={(event) => setSelectedUdid(event.target.value)}
-                  >
-                    {simulators.map((simulator) => (
-                      <option key={simulator.udid} value={simulator.udid}>
-                        {simulator.name} ({simulator.runtime}){" "}
-                        {simulator.state === "Booted" ? "- Booted" : ""}
-                      </option>
-                    ))}
-                  </DeviceSelect>
-                  <PrimaryButton
-                    type="button"
-                    disabled={!selectedUdid || isLoading}
-                    onClick={() => openSurface().catch(() => undefined)}
-                  >
-                    {isLoading ? "Starting..." : "Open simulator"}
-                  </PrimaryButton>
-                </ActionSection>
-                {creationOptions.length > 0 && (
+                {supportsIOSSimulator && (
                   <>
-                    <ActionDivider />
                     <ActionSection>
-                      <ActionLabel>Create simulator</ActionLabel>
+                      <ActionLabel>Available simulators</ActionLabel>
                       <DeviceSelect
-                        aria-label="New iOS simulator type"
-                        value={selectedDeviceType}
-                        disabled={isLoading}
-                        onChange={(event) => setSelectedDeviceType(event.target.value)}
+                        aria-label="Available iOS simulators"
+                        value={selectedUdid}
+                        disabled={isLoading || simulators.length === 0}
+                        onChange={(event) => setSelectedUdid(event.target.value)}
                       >
-                        {creationOptions.map((option) => (
-                          <option
-                            key={option.deviceTypeIdentifier}
-                            value={option.deviceTypeIdentifier}
-                          >
-                            {option.name} ({option.runtimeName})
+                        {simulators.map((simulator) => (
+                          <option key={simulator.udid} value={simulator.udid}>
+                            {simulator.name} ({simulator.runtime}){" "}
+                            {simulator.state === "Booted" ? "- Booted" : ""}
                           </option>
                         ))}
                       </DeviceSelect>
-                      <SecondaryButton
+                      <PrimaryButton
                         type="button"
-                        disabled={isLoading}
-                        onClick={() => createSurface().catch(() => undefined)}
+                        disabled={!selectedUdid || isLoading}
+                        onClick={() => openSurface().catch(() => undefined)}
                       >
-                        {isLoading ? "Creating..." : "Create simulator"}
-                      </SecondaryButton>
+                        {isLoading ? "Starting..." : "Open simulator"}
+                      </PrimaryButton>
                     </ActionSection>
+                    {creationOptions.length > 0 && (
+                      <>
+                        <ActionDivider />
+                        <ActionSection>
+                          <ActionLabel>Create simulator</ActionLabel>
+                          <DeviceSelect
+                            aria-label="New iOS simulator type"
+                            value={selectedDeviceType}
+                            disabled={isLoading}
+                            onChange={(event) => setSelectedDeviceType(event.target.value)}
+                          >
+                            {creationOptions.map((option) => (
+                              <option
+                                key={option.deviceTypeIdentifier}
+                                value={option.deviceTypeIdentifier}
+                              >
+                                {option.name} ({option.runtimeName})
+                              </option>
+                            ))}
+                          </DeviceSelect>
+                          <SecondaryButton
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => createSurface().catch(() => undefined)}
+                          >
+                            {isLoading ? "Creating..." : "Create simulator"}
+                          </SecondaryButton>
+                        </ActionSection>
+                      </>
+                    )}
+                    <ActionDivider />
                   </>
                 )}
-                <ActionDivider />
                 <ActionSection>
                   <ActionLabel>Android emulators and devices</ActionLabel>
                   <DeviceSelect
@@ -2221,7 +2234,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                 title="Refresh mobile devices"
                 disabled={isLoading || isAndroidLoading}
                 onClick={() => {
-                  loadSimulators().catch(() => undefined)
+                  if (supportsIOSSimulator) loadSimulators().catch(() => undefined)
                   loadAndroidDevices().catch(() => undefined)
                 }}
               >

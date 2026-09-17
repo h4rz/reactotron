@@ -1,0 +1,117 @@
+name: Build desktop platforms
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build
+        required: true
+        default: development
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            os: windows-2022
+            target: windows
+          - platform: Linux
+            os: ubuntu-22.04
+            target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - run: corepack enable
+      - run: corepack yarn install --immutable
+      - run: corepack yarn build
+      - name: Package Reactotron
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: corepack yarn workspace reactotron-app build:release
+
+      - name: Verify Windows package
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $serveSimPath = "apps/reactotron-app/release/win-unpacked/resources/app.asar.unpacked/node_modules/serve-sim"
+          if (Test-Path $serveSimPath) {
+            throw "macOS-only serve-sim files were packaged for Windows"
+          }
+          $app = Get-Item "apps/reactotron-app/release/win-unpacked/Reactotron.exe"
+          if ($app.Length -le 0) {
+            throw "Reactotron.exe is empty"
+          }
+          $asarPath = "apps/reactotron-app/release/win-unpacked/resources/app.asar"
+          $asarEntries = & node_modules/.bin/asar.cmd list $asarPath
+          if ($asarEntries | Select-String "node_modules[/\\]serve-sim") {
+            throw "macOS-only serve-sim files were included in app.asar"
+          }
+          if (!($asarEntries | Select-String "THIRD_PARTY_NOTICES.md")) {
+            throw "Third-party notices are missing from app.asar"
+          }
+          $process = Start-Process $app.FullName -ArgumentList "--disable-gpu" -PassThru
+          Start-Sleep -Seconds 10
+          if ($process.HasExited) {
+            throw "Reactotron exited during the Windows startup smoke test"
+          }
+          Stop-Process -Id $process.Id -Force
+
+      - name: Verify Linux package
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e apps/reactotron-app/release/linux-unpacked/resources/app.asar.unpacked/node_modules/serve-sim
+          test -x apps/reactotron-app/release/linux-unpacked/reactotron-app
+          asar_path=apps/reactotron-app/release/linux-unpacked/resources/app.asar
+          node_modules/.bin/asar list "$asar_path" > "$RUNNER_TEMP/reactotron-asar-entries.txt"
+          if grep -Eq 'node_modules[/\\]serve-sim' "$RUNNER_TEMP/reactotron-asar-entries.txt"; then
+            echo "macOS-only serve-sim files were included in app.asar" >&2
+            exit 1
+          fi
+          grep -q 'THIRD_PARTY_NOTICES.md' "$RUNNER_TEMP/reactotron-asar-entries.txt"
+          xvfb-run -a apps/reactotron-app/release/linux-unpacked/reactotron-app --disable-gpu &
+          app_pid=$!
+          sleep 10
+          kill -0 "$app_pid"
+          kill "$app_pid"
+          wait "$app_pid" || true
+
+      - name: Upload Windows artifacts
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reactotron-windows
+          if-no-files-found: error
+          path: |
+            apps/reactotron-app/release/*.exe
+            apps/reactotron-app/release/*.msi
+            apps/reactotron-app/release/*.yml
+            apps/reactotron-app/release/*.blockmap
+
+      - name: Upload Linux artifacts
+        if: matrix.target == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reactotron-linux
+          if-no-files-found: error
+          path: |
+            apps/reactotron-app/release/*.AppImage
+            apps/reactotron-app/release/*.deb
+            apps/reactotron-app/release/*.rpm
+            apps/reactotron-app/release/*.snap
+            apps/reactotron-app/release/*.yml
+            apps/reactotron-app/release/*.blockmap

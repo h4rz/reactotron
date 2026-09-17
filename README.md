@@ -70,7 +70,9 @@ The Android surface supports taps, swipes, dragging, keyboard input, and paste, 
 
 ## Install
 
-Download the desktop app from the [Releases](https://github.com/hurajgor/reactotron/releases) page for macOS, Linux, or Windows.
+macOS is the primary development platform. Windows and Linux installers are built on native GitHub runners and receive automated packaging checks, but their full device workflows still need more community runtime testing. If you use either platform, test reports and fixes are welcome.
+
+Download Reactotron for macOS, Windows, or Linux from the [Releases](https://github.com/h4rz/reactotron/releases) page.
 
 Internal macOS builds are code-signed for both Intel and Apple Silicon. They are not notarized, so macOS may require you to move Reactotron to Applications and select **Open Anyway** in **System Settings → Privacy & Security** on first launch.
 
@@ -88,7 +90,7 @@ Use the scoped `@hurajgor/*` integrations as well, for example `@hurajgor/reacto
 
 Latest desktop release:
 
-- [Reactotron 3.13.0](https://github.com/hurajgor/reactotron/releases/tag/reactotron-app%403.13.0)
+- [Reactotron 3.14.3](https://github.com/h4rz/reactotron/releases/tag/reactotron-app%403.14.3)
 
 ## Get started
 

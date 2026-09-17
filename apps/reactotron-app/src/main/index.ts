@@ -6,6 +6,7 @@ import Store from "electron-store"
 import { autoUpdater } from "electron-updater"
 import windowStateKeeper from "electron-window-state"
 
+import { isIOSSimulatorSupported } from "../platform"
 import createMenu from "./menu"
 import { killOrphanedServeSimProcesses } from "./serve-sim-cleanup"
 import {
@@ -16,6 +17,7 @@ import {
 
 const isDevelopment = process.env.NODE_ENV !== "production"
 const isDevApp = process.env.REACTOTRON_DEV_APP === "1"
+const isMacOS = isIOSSimulatorSupported(process.platform)
 const appName = isDevApp ? "Reactotron Dev" : "Reactotron"
 
 Store.initRenderer()
@@ -114,7 +116,8 @@ function createMainWindow() {
   })
 
   window.webContents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown" || !input.meta) return
+    const hasPlatformModifier = isMacOS ? input.meta : input.control
+    if (input.type !== "keyDown" || !hasPlatformModifier) return
 
     const key = input.key.toLowerCase()
     const shortcut =
@@ -141,7 +144,7 @@ function createMainWindow() {
 // quit application when all windows are closed
 app.on("window-all-closed", app.quit)
 
-app.on("before-quit", stopIOSSimulatorSurfaces)
+if (isMacOS) app.on("before-quit", stopIOSSimulatorSurfaces)
 
 app.on("activate", () => {
   // on macOS it is common to re-create a window even after all windows have been closed
@@ -167,7 +170,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("ready", () => {
     // Runs before any surface starts so a stranded server from a previous run
     // cannot keep holding the port this one is about to ask for.
-    killOrphanedServeSimProcesses()
+    if (isMacOS) killOrphanedServeSimProcesses()
 
     mainWindow = createMainWindow()
 

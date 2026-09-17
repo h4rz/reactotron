@@ -3,6 +3,7 @@ import fs from "fs"
 import http from "http"
 import net from "net"
 import path from "path"
+import { isIOSSimulatorSupported } from "../platform"
 import { getAdbPath } from "./adb-path"
 import { startAndroidScrcpyStream, type AndroidScrcpyStream } from "./android-scrcpy"
 import {
@@ -754,7 +755,6 @@ const reloadReactNativeViaMetro = (metroPort: number) =>
   })
 
 export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
-  simulatorSurfaceWindow = mainWindow ?? null
   ipcMain.handle("android-device-screenshot-action", async (event, deviceId: unknown) => {
     try {
       assertAndroidDeviceId(deviceId)
@@ -990,6 +990,10 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
       }
     }
   )
+
+  if (!isIOSSimulatorSupported(process.platform)) return
+
+  simulatorSurfaceWindow = mainWindow ?? null
 
   ipcMain.handle("list-booted-ios-simulators", async () => {
     try {

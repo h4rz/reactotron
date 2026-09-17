@@ -29,7 +29,9 @@ if (isCi) {
   // build, so no manual post-build re-signing is required. Without an
   // identity we fall back to an unsigned build.
   const localIdentity = process.env.MAC_SIGN_IDENTITY || process.env.CSC_NAME
-  if (BUILD_TARGET === "macos" && localIdentity) {
+  if (BUILD_TARGET !== "macos") {
+    console.log(`No code-signing configuration is required for the ${BUILD_TARGET} target`)
+  } else if (localIdentity) {
     console.log(`Signing local build with identity: '${localIdentity}'`)
   } else {
     console.log("Not running in CI and no signing identity provided, skipping code signing")

@@ -155,24 +155,30 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist"
+      "entitlementsInherit": "entitlements.mac.plist",
+      "asarUnpack": [
+        "node_modules/serve-sim/**"
+      ]
     },
     "publish": {
       "provider": "github",
       "owner": "hurajgor",
       "repo": "reactotron"
     },
-    "asarUnpack": [
-      "node_modules/serve-sim/**"
-    ],
     "win": {
       "icon": "./icon.png",
+      "files": [
+        "!node_modules/serve-sim/**"
+      ],
       "target": [
         "nsis",
         "msi"
       ]
     },
     "linux": {
+      "files": [
+        "!node_modules/serve-sim/**"
+      ],
       "target": [
         "deb",
         "rpm",

@@ -107,7 +107,7 @@ const treeValueColor: Record<TreeValueType, string> = {
 }
 
 const treePreviewLimit = 80
-const monoFont = `ui-monospace, "SF Mono", Menlo, Consolas, monospace`
+const monoFont = `var(--reactotron-monospace-font, ui-monospace, "SF Mono", Menlo, Consolas, monospace)`
 
 const Container = styled.div`
   display: flex;
@@ -523,7 +523,7 @@ const ExpandedBody = styled.div`
   background-color: ${(props) => props.theme.backgroundSubtleDark};
   color: ${(props) => props.theme.foreground};
   font-family: ${monoFont};
-  font-size: 12px;
+  font-size: var(--reactotron-monospace-font-size, 12px);
   line-height: 20px;
   cursor: auto;
   user-select: text;
@@ -572,7 +572,7 @@ const CountBadge = styled.span`
   background-color: rgba(65, 72, 104, 0.6);
   color: ${(props) => props.theme.foregroundLight};
   font-family: ${monoFont};
-  font-size: 10px;
+  font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.833);
   font-weight: 700;
   line-height: 16px;
 `
@@ -587,7 +587,7 @@ const SourceChip = styled.button`
   background-color: rgba(122, 162, 247, 0.12);
   color: ${(props) => props.theme.support};
   font-family: ${monoFont};
-  font-size: 10.5px;
+  font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.875);
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -612,7 +612,7 @@ const Method = styled.strong<{ $kind: ConsoleKind }>`
   min-width: 0;
   color: ${(props) => (props.$kind === "network" ? props.theme.support : props.theme.keyword)};
   font-family: ${monoFont};
-  font-size: 11px;
+  font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.917);
   line-height: 18px;
 `
 
@@ -631,14 +631,14 @@ const EventTitle = styled.span`
   }
 
   b {
-    font-size: 12px;
+    font-size: var(--reactotron-monospace-font-size, 12px);
     font-weight: 500;
     line-height: 18px;
   }
 
   small {
     color: ${(props) => props.theme.foregroundDark};
-    font-size: 10.5px;
+    font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.875);
     line-height: 14px;
   }
 `
@@ -671,7 +671,7 @@ const Status = styled.i<{ $tone: ConsoleItem["tone"] }>`
   border-radius: 999px;
   color: ${(props) => toneColor(props.$tone)};
   background-color: rgba(65, 72, 104, 0.42);
-  font-size: 11px;
+  font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.917);
   font-style: normal;
   font-weight: 700;
 `
@@ -688,7 +688,7 @@ const Time = styled.small`
   align-items: flex-end;
   color: ${(props) => props.theme.foregroundDark};
   font-family: ${monoFont};
-  font-size: 10.5px;
+  font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.875);
   line-height: 14px;
 
   em {

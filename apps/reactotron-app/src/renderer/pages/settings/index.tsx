@@ -1,12 +1,16 @@
 import React, { useContext, useEffect, useState } from "react"
 import { Header, themes, themeVariants, type ThemeStyle } from "@hurajgor/reactotron-core-ui"
+import { LuMoon, LuPalette, LuSettings2, LuSun } from "react-icons/lu"
 import styled from "styled-components"
 
 import AppPreferencesContext, {
   ThemeAppearance,
+  TypographyPreferencesContext,
   maxMaxCommands,
   minMaxCommands,
 } from "../../contexts/AppPreferences"
+import { resolveInterfaceFont, resolveMonospaceFont } from "../../typography"
+import FontFamilyPicker from "./FontFamilyPicker"
 
 const Container = styled.div`
   display: flex;
@@ -75,14 +79,11 @@ const SettingsNavButton = styled.button<{ $isActive: boolean }>`
   font-weight: ${(props) => (props.$isActive ? 600 : 500)};
   text-align: left;
 
-  &::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    flex: 0 0 7px;
-    border: 1px solid currentColor;
-    border-radius: ${(props) => (props.$isActive ? "2px" : "50%")};
-    background: ${(props) => (props.$isActive ? props.theme.highlight : "transparent")};
+  svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    stroke-width: 1.8;
   }
 
   &:hover {
@@ -278,10 +279,29 @@ const ThemeCard = styled.div<{ $isActive: boolean }>`
   }
 `
 
+const ThemeCardSelectButton = styled.button`
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: 2px;
+  }
+`
+
 const ThemePreviewPair = styled.span`
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 10px;
+  pointer-events: none;
 `
 
 const ThemeOrb = styled.button<{
@@ -292,48 +312,71 @@ const ThemeOrb = styled.button<{
   $isActive: boolean
 }>`
   position: relative;
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  border: 1px solid ${(props) => (props.$isActive ? props.theme.highlight : props.$surface)};
+  width: 50px;
+  height: 50px;
+  padding: 3px;
+  border: 0;
   border-radius: 50%;
   background: radial-gradient(
       circle at 70% 28%,
-      ${(props) => props.$foreground} 0 5%,
-      transparent 6%
+      ${(props) => props.$foreground} 0 4%,
+      transparent 5%
     ),
     radial-gradient(circle at 30% 72%, ${(props) => props.$accent} 0 22%, transparent 45%),
     linear-gradient(145deg, ${(props) => props.$surface}, ${(props) => props.$background});
-  box-shadow: 0 4px 10px ${(props) => props.theme.glow};
+  background-clip: content-box;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, ${(props) => props.$foreground} 35%, transparent),
+    0 4px 10px ${(props) => props.theme.glow};
   cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease-out;
 
   ${(props) =>
     props.$isActive &&
-    `box-shadow: 0 0 0 2px ${props.theme.backgroundLighter}, 0 0 0 4px ${props.theme.highlight};`}
+    `box-shadow: inset 0 0 0 2px ${props.theme.highlight}, 0 4px 10px ${props.theme.glow};`}
+
+  &:hover {
+    transform: ${(props) => (props.$isActive ? "none" : "scale(1.05)")};
+  }
 
   &:focus-visible {
     outline: 2px solid ${(props) => props.theme.highlight};
-    outline-offset: 4px;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 `
 
 const OrbModeBadge = styled.span`
   position: absolute;
-  right: -4px;
-  bottom: -4px;
+  right: 0;
+  bottom: 0;
   display: grid;
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border: 1px solid ${(props) => props.theme.chromeLine};
   border-radius: 50%;
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
-  font-size: 9px;
-  font-weight: 700;
+
+  svg {
+    width: 11px;
+    height: 11px;
+    stroke-width: 2;
+  }
 `
 
 const ThemeCardFooter = styled.span`
+  position: relative;
+  z-index: 2;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -342,30 +385,18 @@ const ThemeCardFooter = styled.span`
   gap: 10px;
   font-size: 13px;
   font-weight: 600;
+  pointer-events: none;
 `
 
-const ThemeNameButton = styled.button`
+const ThemeName = styled.span`
   min-width: 0;
-  padding: 0;
   overflow: hidden;
-  border: 0;
-  background: transparent;
   color: inherit;
-  cursor: pointer;
   font: inherit;
   font-weight: 600;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-
-  &:hover {
-    color: ${(props) => props.theme.highlight};
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${(props) => props.theme.highlight};
-    outline-offset: 3px;
-  }
 `
 
 const ActiveMark = styled.span`
@@ -378,6 +409,103 @@ const ActiveMark = styled.span`
   background: ${(props) => props.theme.highlight};
   color: ${(props) => props.theme.tagComplement};
   font-size: 11px;
+`
+
+const TypographyHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+`
+
+const TypographyPanel = styled.div`
+  overflow: visible;
+  border: 1px solid ${(props) => props.theme.chromeLine};
+  border-radius: 12px;
+  background: ${(props) => props.theme.backgroundLighter};
+`
+
+const TypographyRow = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 330px);
+  gap: 14px 24px;
+  padding: 17px 20px;
+  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const TypographyTitle = styled.h3`
+  margin: 0 0 5px;
+  color: ${(props) => props.theme.foregroundLight};
+  font-size: 14px;
+  font-weight: 650;
+`
+
+const TypographyDescription = styled.p`
+  margin: 0;
+  color: ${(props) => props.theme.foregroundDark};
+  font-size: 12px;
+  line-height: 18px;
+`
+
+const TypographyControls = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 10px;
+  align-self: center;
+`
+
+const TypographySelect = styled.select`
+  min-width: 0;
+  height: 36px;
+  padding: 0 30px 0 11px;
+  border: 1px solid ${(props) => props.theme.chromeLine};
+  border-radius: 8px;
+  background: ${(props) => props.theme.background};
+  color: ${(props) => props.theme.foreground};
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: 1px;
+  }
+`
+
+const FontPreview = styled.div<{ $family: string; $size: number; $monospace?: boolean }>`
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px 14px;
+  border: 1px solid ${(props) => props.theme.chromeLine};
+  border-radius: 8px;
+  background: ${(props) => props.theme.background};
+  color: ${(props) => props.theme.foreground};
+  font-family: ${(props) => props.$family};
+  font-size: ${(props) => props.$size}px;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: ${(props) => (props.$monospace ? "pre" : "normal")};
+`
+
+const SmoothingControl = styled.label`
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  color: ${(props) => props.theme.foregroundDark};
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
 `
 
 const PreferencesPanel = styled.section`
@@ -492,19 +620,13 @@ const ToggleThumb = styled.span<{ $isEnabled: boolean }>`
 `
 
 const themeOptions: Array<{ label: string; value: ThemeStyle }> = [
-  { label: "T3 Code", value: "t3Code" },
   { label: "Ocean", value: "ocean" },
   { label: "Iris", value: "iris" },
+  { label: "One", value: "one" },
   { label: "Solarized", value: "solarized" },
   { label: "Kanagawa", value: "kanagawa" },
   { label: "Everforest", value: "everforest" },
   { label: "Gruvbox", value: "gruvbox" },
-]
-
-const legacyThemeOptions: Array<{ label: string; value: ThemeStyle }> = [
-  { label: "Catppuccin · Legacy", value: "catppuccin" },
-  { label: "One · Legacy", value: "one" },
-  { label: "Nord · Legacy", value: "nord" },
 ]
 
 const appearanceOptions: Array<{ label: string; value: ThemeAppearance }> = [
@@ -528,13 +650,22 @@ function Settings() {
     maxCommands,
     setMaxCommands,
   } = useContext(AppPreferencesContext)
+  const {
+    interfaceFont,
+    setInterfaceFont,
+    interfaceFontSize,
+    setInterfaceFontSize,
+    monospaceFont,
+    setMonospaceFont,
+    monospaceFontSize,
+    setMonospaceFontSize,
+    fontSmoothing,
+    setFontSmoothing,
+  } = useContext(TypographyPreferencesContext)
 
   const [activeSection, setActiveSection] = useState<"general" | "appearance">("appearance")
   const [maxCommandsDraft, setMaxCommandsDraft] = useState(String(maxCommands))
-  const selectedLegacyThemes = legacyThemeOptions.filter(
-    (option) => option.value === lightThemeStyle || option.value === darkThemeStyle
-  )
-  const displayedThemeOptions = [...themeOptions, ...selectedLegacyThemes]
+  const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform)
 
   useEffect(() => {
     setMaxCommandsDraft(String(maxCommands))
@@ -563,6 +694,7 @@ function Settings() {
               aria-current={activeSection === "general" ? "page" : undefined}
               onClick={() => setActiveSection("general")}
             >
+              <LuSettings2 aria-hidden="true" />
               General
             </SettingsNavButton>
             <SettingsNavButton
@@ -571,6 +703,7 @@ function Settings() {
               aria-current={activeSection === "appearance" ? "page" : undefined}
               onClick={() => setActiveSection("appearance")}
             >
+              <LuPalette aria-hidden="true" />
               Appearance
             </SettingsNavButton>
           </SettingsNav>
@@ -607,9 +740,11 @@ function Settings() {
                 </AppearanceSection>
 
                 <AppearanceSection>
-                  <SectionLabel>Themes · choose each circle or use the name for both</SectionLabel>
+                  <SectionLabel>
+                    Themes · choose each circle or click the card for both
+                  </SectionLabel>
                   <ThemeGrid>
-                    {displayedThemeOptions.map((option) => {
+                    {themeOptions.map((option) => {
                       const variants = themeVariants[option.value]
                       const lightTheme = themes[variants.light]
                       const darkTheme = themes[variants.dark]
@@ -618,7 +753,13 @@ function Settings() {
                       const bothAreActive = lightIsActive && darkIsActive
 
                       return (
-                        <ThemeCard key={option.value} $isActive={lightIsActive || darkIsActive}>
+                        <ThemeCard key={option.value} $isActive={bothAreActive}>
+                          <ThemeCardSelectButton
+                            type="button"
+                            aria-label={`Use ${option.label} for both light and dark appearances`}
+                            aria-pressed={bothAreActive}
+                            onClick={() => setThemeStyle(option.value)}
+                          />
                           <ThemePreviewPair>
                             <ThemeOrb
                               type="button"
@@ -629,9 +770,16 @@ function Settings() {
                               $surface={lightTheme.backgroundLighter}
                               $accent={lightTheme.highlight}
                               $foreground={lightTheme.foreground}
-                              onClick={() => setThemeStyleForAppearance("light", option.value)}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setThemeStyleForAppearance("light", option.value)
+                              }}
                             >
-                              <OrbModeBadge aria-hidden="true">L</OrbModeBadge>
+                              {lightIsActive && (
+                                <OrbModeBadge aria-hidden="true">
+                                  <LuSun />
+                                </OrbModeBadge>
+                              )}
                             </ThemeOrb>
                             <ThemeOrb
                               type="button"
@@ -642,27 +790,115 @@ function Settings() {
                               $surface={darkTheme.backgroundLighter}
                               $accent={darkTheme.highlight}
                               $foreground={darkTheme.foreground}
-                              onClick={() => setThemeStyleForAppearance("dark", option.value)}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setThemeStyleForAppearance("dark", option.value)
+                              }}
                             >
-                              <OrbModeBadge aria-hidden="true">D</OrbModeBadge>
+                              {darkIsActive && (
+                                <OrbModeBadge aria-hidden="true">
+                                  <LuMoon />
+                                </OrbModeBadge>
+                              )}
                             </ThemeOrb>
                           </ThemePreviewPair>
                           <ThemeCardFooter>
-                            <ThemeNameButton
-                              type="button"
-                              aria-label={`Use ${option.label} for both light and dark appearances`}
-                              onClick={() => setThemeStyle(option.value)}
-                            >
-                              {option.label}
-                            </ThemeNameButton>
-                            {bothAreActive && (
-                              <ActiveMark aria-label="Selected for both">✓</ActiveMark>
-                            )}
+                            <ThemeName>{option.label}</ThemeName>
+                            {bothAreActive && <ActiveMark aria-hidden="true">✓</ActiveMark>}
                           </ThemeCardFooter>
                         </ThemeCard>
                       )
                     })}
                   </ThemeGrid>
+                </AppearanceSection>
+
+                <AppearanceSection>
+                  <TypographyHeader>
+                    <SectionLabel>Typography</SectionLabel>
+                    {isMac && (
+                      <SmoothingControl>
+                        Font smoothing
+                        <ToggleInput
+                          type="checkbox"
+                          aria-label="Use antialiased font smoothing"
+                          checked={fontSmoothing}
+                          onChange={(event) => setFontSmoothing(event.target.checked)}
+                        />
+                        <ToggleTrack $isEnabled={fontSmoothing}>
+                          <ToggleThumb $isEnabled={fontSmoothing} />
+                        </ToggleTrack>
+                      </SmoothingControl>
+                    )}
+                  </TypographyHeader>
+                  <TypographyPanel>
+                    <TypographyRow>
+                      <div>
+                        <TypographyTitle>Interface font</TypographyTitle>
+                        <TypographyDescription>
+                          Navigation, settings, labels, and timeline content.
+                        </TypographyDescription>
+                      </div>
+                      <TypographyControls>
+                        <FontFamilyPicker
+                          ariaLabel="Interface font family"
+                          value={interfaceFont}
+                          onChange={setInterfaceFont}
+                        />
+                        <TypographySelect
+                          aria-label="Interface font size"
+                          value={interfaceFontSize}
+                          onChange={(event) => setInterfaceFontSize(Number(event.target.value))}
+                        >
+                          {Array.from({ length: 9 }, (_, index) => index + 12).map((size) => (
+                            <option key={size} value={size}>
+                              {size} px
+                            </option>
+                          ))}
+                        </TypographySelect>
+                      </TypographyControls>
+                      <FontPreview
+                        $family={resolveInterfaceFont(interfaceFont)}
+                        $size={interfaceFontSize}
+                      >
+                        Connection established · Timeline ready for inspection.
+                      </FontPreview>
+                    </TypographyRow>
+
+                    <TypographyRow>
+                      <div>
+                        <TypographyTitle>Monospace font</TypographyTitle>
+                        <TypographyDescription>
+                          Timestamps, network requests, payloads, and diagnostic values.
+                        </TypographyDescription>
+                      </div>
+                      <TypographyControls>
+                        <FontFamilyPicker
+                          ariaLabel="Monospace font family"
+                          value={monospaceFont}
+                          requireMonospace
+                          onChange={setMonospaceFont}
+                        />
+                        <TypographySelect
+                          aria-label="Monospace font size"
+                          value={monospaceFontSize}
+                          onChange={(event) => setMonospaceFontSize(Number(event.target.value))}
+                        >
+                          {Array.from({ length: 9 }, (_, index) => index + 10).map((size) => (
+                            <option key={size} value={size}>
+                              {size} px
+                            </option>
+                          ))}
+                        </TypographySelect>
+                      </TypographyControls>
+                      <FontPreview
+                        $family={resolveMonospaceFont(monospaceFont)}
+                        $size={monospaceFontSize}
+                        $monospace
+                      >
+                        {'GET /api/session   200   42 ms   { "connected": true }'}
+                      </FontPreview>
+                    </TypographyRow>
+                  </TypographyPanel>
                 </AppearanceSection>
               </>
             ) : (

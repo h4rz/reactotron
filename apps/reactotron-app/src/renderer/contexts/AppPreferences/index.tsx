@@ -6,6 +6,19 @@ import {
   type ThemeStyle,
 } from "@hurajgor/reactotron-core-ui"
 
+import {
+  clampInterfaceFontSize,
+  clampMonospaceFontSize,
+  defaultInterfaceFont,
+  defaultInterfaceFontSize,
+  defaultMonospaceFont,
+  defaultMonospaceFontSize,
+  isInterfaceFont,
+  isMonospaceFont,
+  type InterfaceFont,
+  type MonospaceFont,
+} from "../../typography"
+
 export type ThemeAppearance = "system" | "dark" | "light"
 
 const themeModeStorageKey = "reactotron.themeMode"
@@ -16,6 +29,11 @@ const themeAppearanceStorageKey = "reactotron.themeAppearance"
 const newTimelineStorageKey = "reactotron.enableNewTimeline"
 const startWithCompactSidebarStorageKey = "reactotron.startWithCompactSidebar"
 const maxCommandsStorageKey = "reactotron.maxCommands"
+const interfaceFontStorageKey = "reactotron.interfaceFont"
+const interfaceFontSizeStorageKey = "reactotron.interfaceFontSize"
+const monospaceFontStorageKey = "reactotron.monospaceFont"
+const monospaceFontSizeStorageKey = "reactotron.monospaceFontSize"
+const fontSmoothingStorageKey = "reactotron.fontSmoothing"
 const themeModeChangeEvent = "reactotron-theme-mode-changed"
 
 /**
@@ -37,6 +55,24 @@ const legacyThemeMigrations: Record<
   ayuMirage: { themeStyle: "everforest", themeAppearance: "dark" },
 }
 
+const retainedThemeStyles: readonly ThemeStyle[] = [
+  "ocean",
+  "iris",
+  "one",
+  "solarized",
+  "kanagawa",
+  "everforest",
+  "gruvbox",
+]
+
+function isRetainedThemeStyle(value: string | null): value is ThemeStyle {
+  return retainedThemeStyles.includes(value as ThemeStyle)
+}
+
+function normalizeThemeStyle(themeStyle: ThemeStyle): ThemeStyle {
+  return isRetainedThemeStyle(themeStyle) ? themeStyle : "ocean"
+}
+
 interface Context {
   themeMode: ThemeName
   themeStyle: ThemeStyle
@@ -55,6 +91,19 @@ interface Context {
   setStartWithCompactSidebar: (isEnabled: boolean) => void
   maxCommands: number
   setMaxCommands: (maxCommands: number) => void
+}
+
+interface TypographyContext {
+  interfaceFont: InterfaceFont
+  setInterfaceFont: (font: InterfaceFont) => void
+  interfaceFontSize: number
+  setInterfaceFontSize: (size: number) => void
+  monospaceFont: MonospaceFont
+  setMonospaceFont: (font: MonospaceFont) => void
+  monospaceFontSize: number
+  setMonospaceFontSize: (size: number) => void
+  fontSmoothing: boolean
+  setFontSmoothing: (isEnabled: boolean) => void
 }
 
 const noop = (): void => {
@@ -79,7 +128,7 @@ function readLegacyThemePreference(): {
     const variants = themeVariants[style]
     return variants.dark === savedThemeMode || variants.light === savedThemeMode
   })
-  if (!match) return null
+  if (!match || !isRetainedThemeStyle(match)) return null
 
   return {
     themeStyle: match,
@@ -88,19 +137,19 @@ function readLegacyThemePreference(): {
 }
 
 function readThemeStyle(): ThemeStyle {
-  if (typeof window === "undefined") return "solarized"
+  if (typeof window === "undefined") return "ocean"
 
   const savedThemeStyle = window.localStorage.getItem(themeStyleStorageKey)
-  if (themeStyles.includes(savedThemeStyle as ThemeStyle)) return savedThemeStyle as ThemeStyle
+  if (isRetainedThemeStyle(savedThemeStyle)) return savedThemeStyle
 
-  return readLegacyThemePreference()?.themeStyle ?? "solarized"
+  return readLegacyThemePreference()?.themeStyle ?? "ocean"
 }
 
 function readThemeStyleForAppearance(storageKey: string): ThemeStyle {
-  if (typeof window === "undefined") return "solarized"
+  if (typeof window === "undefined") return "ocean"
 
   const savedThemeStyle = window.localStorage.getItem(storageKey)
-  if (themeStyles.includes(savedThemeStyle as ThemeStyle)) return savedThemeStyle as ThemeStyle
+  if (isRetainedThemeStyle(savedThemeStyle)) return savedThemeStyle
 
   return readThemeStyle()
 }
@@ -161,12 +210,38 @@ function readMaxCommands(): number {
   return clampMaxCommands(parsed)
 }
 
+function readInterfaceFont(): InterfaceFont {
+  if (typeof window === "undefined") return defaultInterfaceFont
+  const saved = window.localStorage.getItem(interfaceFontStorageKey)
+  return isInterfaceFont(saved) ? saved : defaultInterfaceFont
+}
+
+function readMonospaceFont(): MonospaceFont {
+  if (typeof window === "undefined") return defaultMonospaceFont
+  const saved = window.localStorage.getItem(monospaceFontStorageKey)
+  return isMonospaceFont(saved) ? saved : defaultMonospaceFont
+}
+
+function readStoredNumber(storageKey: string, fallback: number, clamp: (value: number) => number) {
+  if (typeof window === "undefined") return fallback
+  const saved = window.localStorage.getItem(storageKey)
+  if (saved === null) return fallback
+  const parsed = Number(saved)
+  return Number.isFinite(parsed) ? clamp(parsed) : fallback
+}
+
+function readFontSmoothing(): boolean {
+  if (typeof window === "undefined") return true
+  const saved = window.localStorage.getItem(fontSmoothingStorageKey)
+  return saved === null ? true : saved === "true"
+}
+
 const AppPreferencesContext = React.createContext<Context>({
-  themeMode: "solarizedDark",
-  themeStyle: "solarized",
+  themeMode: "oceanDark",
+  themeStyle: "ocean",
   setThemeStyle: noop,
-  lightThemeStyle: "solarized",
-  darkThemeStyle: "solarized",
+  lightThemeStyle: "ocean",
+  darkThemeStyle: "ocean",
   setThemeStyleForAppearance: noop,
   themeAppearance: "system",
   setThemeAppearance: noop,
@@ -176,6 +251,19 @@ const AppPreferencesContext = React.createContext<Context>({
   setStartWithCompactSidebar: noop,
   maxCommands: defaultMaxCommands,
   setMaxCommands: noop,
+})
+
+const TypographyPreferencesContext = React.createContext<TypographyContext>({
+  interfaceFont: defaultInterfaceFont,
+  setInterfaceFont: noop,
+  interfaceFontSize: defaultInterfaceFontSize,
+  setInterfaceFontSize: noop,
+  monospaceFont: defaultMonospaceFont,
+  setMonospaceFont: noop,
+  monospaceFontSize: defaultMonospaceFontSize,
+  setMonospaceFontSize: noop,
+  fontSmoothing: true,
+  setFontSmoothing: noop,
 })
 
 const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -192,6 +280,15 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     readStartWithCompactSidebar
   )
   const [maxCommands, setMaxCommandsState] = useState(readMaxCommands)
+  const [interfaceFont, setInterfaceFontState] = useState(readInterfaceFont)
+  const [interfaceFontSize, setInterfaceFontSizeState] = useState(() =>
+    readStoredNumber(interfaceFontSizeStorageKey, defaultInterfaceFontSize, clampInterfaceFontSize)
+  )
+  const [monospaceFont, setMonospaceFontState] = useState(readMonospaceFont)
+  const [monospaceFontSize, setMonospaceFontSizeState] = useState(() =>
+    readStoredNumber(monospaceFontSizeStorageKey, defaultMonospaceFontSize, clampMonospaceFontSize)
+  )
+  const [fontSmoothing, setFontSmoothingState] = useState(readFontSmoothing)
 
   React.useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -213,27 +310,29 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [themeMode])
 
   const setThemeStyle = useCallback((nextThemeStyle: ThemeStyle) => {
-    setLightThemeStyle(nextThemeStyle)
-    setDarkThemeStyle(nextThemeStyle)
+    const normalizedThemeStyle = normalizeThemeStyle(nextThemeStyle)
+    setLightThemeStyle(normalizedThemeStyle)
+    setDarkThemeStyle(normalizedThemeStyle)
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(themeStyleStorageKey, nextThemeStyle)
-      window.localStorage.setItem(lightThemeStyleStorageKey, nextThemeStyle)
-      window.localStorage.setItem(darkThemeStyleStorageKey, nextThemeStyle)
+      window.localStorage.setItem(themeStyleStorageKey, normalizedThemeStyle)
+      window.localStorage.setItem(lightThemeStyleStorageKey, normalizedThemeStyle)
+      window.localStorage.setItem(darkThemeStyleStorageKey, normalizedThemeStyle)
     }
   }, [])
 
   const setThemeStyleForAppearance = useCallback(
     (appearance: Exclude<ThemeAppearance, "system">, nextThemeStyle: ThemeStyle) => {
+      const normalizedThemeStyle = normalizeThemeStyle(nextThemeStyle)
       if (appearance === "light") {
-        setLightThemeStyle(nextThemeStyle)
+        setLightThemeStyle(normalizedThemeStyle)
       } else {
-        setDarkThemeStyle(nextThemeStyle)
+        setDarkThemeStyle(normalizedThemeStyle)
       }
 
       if (typeof window === "undefined") return
       const storageKey =
         appearance === "light" ? lightThemeStyleStorageKey : darkThemeStyleStorageKey
-      window.localStorage.setItem(storageKey, nextThemeStyle)
+      window.localStorage.setItem(storageKey, normalizedThemeStyle)
     },
     []
   )
@@ -265,6 +364,43 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (typeof window === "undefined") return
 
     window.localStorage.setItem(maxCommandsStorageKey, String(clamped))
+  }, [])
+
+  const setInterfaceFont = useCallback((nextFont: InterfaceFont) => {
+    setInterfaceFontState(nextFont)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(interfaceFontStorageKey, nextFont)
+    }
+  }, [])
+
+  const setInterfaceFontSize = useCallback((nextSize: number) => {
+    const clamped = clampInterfaceFontSize(nextSize)
+    setInterfaceFontSizeState(clamped)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(interfaceFontSizeStorageKey, String(clamped))
+    }
+  }, [])
+
+  const setMonospaceFont = useCallback((nextFont: MonospaceFont) => {
+    setMonospaceFontState(nextFont)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(monospaceFontStorageKey, nextFont)
+    }
+  }, [])
+
+  const setMonospaceFontSize = useCallback((nextSize: number) => {
+    const clamped = clampMonospaceFontSize(nextSize)
+    setMonospaceFontSizeState(clamped)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(monospaceFontSizeStorageKey, String(clamped))
+    }
+  }, [])
+
+  const setFontSmoothing = useCallback((isEnabled: boolean) => {
+    setFontSmoothingState(isEnabled)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(fontSmoothingStorageKey, isEnabled ? "true" : "false")
+    }
   }, [])
 
   const value = useMemo(
@@ -302,11 +438,49 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     ]
   )
 
-  return <AppPreferencesContext.Provider value={value}>{children}</AppPreferencesContext.Provider>
+  const typographyValue = useMemo(
+    () => ({
+      interfaceFont,
+      setInterfaceFont,
+      interfaceFontSize,
+      setInterfaceFontSize,
+      monospaceFont,
+      setMonospaceFont,
+      monospaceFontSize,
+      setMonospaceFontSize,
+      fontSmoothing,
+      setFontSmoothing,
+    }),
+    [
+      fontSmoothing,
+      interfaceFont,
+      interfaceFontSize,
+      monospaceFont,
+      monospaceFontSize,
+      setFontSmoothing,
+      setInterfaceFont,
+      setInterfaceFontSize,
+      setMonospaceFont,
+      setMonospaceFontSize,
+    ]
+  )
+
+  return (
+    <AppPreferencesContext.Provider value={value}>
+      <TypographyPreferencesContext.Provider value={typographyValue}>
+        {children}
+      </TypographyPreferencesContext.Provider>
+    </AppPreferencesContext.Provider>
+  )
 }
 
 export {
   maxCommandsStorageKey,
+  fontSmoothingStorageKey,
+  interfaceFontSizeStorageKey,
+  interfaceFontStorageKey,
+  monospaceFontSizeStorageKey,
+  monospaceFontStorageKey,
   darkThemeStyleStorageKey,
   lightThemeStyleStorageKey,
   startWithCompactSidebarStorageKey,
@@ -316,4 +490,5 @@ export {
   themeStyleStorageKey,
 }
 export default AppPreferencesContext
+export { TypographyPreferencesContext }
 export const AppPreferencesProvider = Provider

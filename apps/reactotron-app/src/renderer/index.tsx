@@ -1,12 +1,16 @@
 import "v8-compile-cache"
-import React, { useContext } from "react"
+import React, { useContext, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { ReactotronAppProvider } from "@hurajgor/reactotron-core-ui"
 
 import "./global.css"
 
 import App from "./App"
-import AppPreferencesContext, { AppPreferencesProvider } from "./contexts/AppPreferences"
+import AppPreferencesContext, {
+  AppPreferencesProvider,
+  TypographyPreferencesContext,
+} from "./contexts/AppPreferences"
+import { applyTypographyVariables } from "./typography"
 
 function ThemedApp() {
   const { themeMode } = useContext(AppPreferencesContext)
@@ -18,9 +22,20 @@ function ThemedApp() {
   )
 }
 
+function TypographyAppearanceSync() {
+  const preferences = useContext(TypographyPreferencesContext)
+
+  useEffect(() => {
+    applyTypographyVariables(document.documentElement, preferences)
+  }, [preferences])
+
+  return null
+}
+
 const root = createRoot(document.getElementById("app"))
 root.render(
   <AppPreferencesProvider>
+    <TypographyAppearanceSync />
     <ThemedApp />
   </AppPreferencesProvider>
 )

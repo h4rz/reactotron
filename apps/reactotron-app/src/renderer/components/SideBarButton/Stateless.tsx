@@ -48,8 +48,9 @@ export const SideBarButtonContainer = styled.div.attrs(() => ({}))<SideBarButton
     background-color: ${(props) =>
       props.$colorAnimation > 0.5
         ? `color-mix(in srgb, ${props.theme.highlight} 18%, transparent)`
-        : props.theme.backgroundLighter};
-    color: ${(props) => (props.$colorAnimation > 0.5 ? props.theme.highlight : props.theme.foreground)};
+        : props.theme.surfaceRaised};
+    color: ${(props) =>
+      props.$colorAnimation > 0.5 ? props.theme.highlight : props.theme.foreground};
   }
 `
 

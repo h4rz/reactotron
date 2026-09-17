@@ -125,8 +125,8 @@ const Toolbar = styled.div`
   gap: 10px;
   min-width: 0;
   padding: 12px 16px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfacePanel};
 `
 
 const ToolbarRow = styled.div`
@@ -153,7 +153,7 @@ const FilterGroup = styled.div`
   gap: 8px;
   min-width: 0;
   padding-right: 10px;
-  border-right: 1px solid ${(props) => props.theme.chromeLine};
+  border-right: 1px solid ${(props) => props.theme.borderSubtle};
 
   &:last-child {
     padding-right: 0;
@@ -173,14 +173,15 @@ const SearchBox = styled.label`
   min-width: 220px;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   background-color: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foregroundDark};
 
   &:focus-within {
     border-color: ${(props) => props.theme.highlight};
-    box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.16);
+    box-shadow: 0 0 0 2px
+      ${(props) => `color-mix(in srgb, ${props.theme.highlight} 18%, transparent)`};
   }
 `
 
@@ -201,7 +202,7 @@ const Toggle = styled.label`
   gap: 6px;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   color: ${(props) => props.theme.foreground};
   background-color: ${(props) => props.theme.background};
@@ -220,7 +221,7 @@ const FilterSelect = styled.select`
   min-width: 0;
   min-height: 34px;
   padding: 0 28px 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   outline: 0;
   background-color: ${(props) => props.theme.background};
@@ -230,7 +231,8 @@ const FilterSelect = styled.select`
 
   &:focus {
     border-color: ${(props) => props.theme.highlight};
-    box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.16);
+    box-shadow: 0 0 0 2px
+      ${(props) => `color-mix(in srgb, ${props.theme.highlight} 18%, transparent)`};
   }
 `
 
@@ -240,7 +242,7 @@ const InlineFilterInput = styled.input`
   min-width: 0;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   outline: 0;
   background-color: ${(props) => props.theme.background};
@@ -249,7 +251,8 @@ const InlineFilterInput = styled.input`
 
   &:focus {
     border-color: ${(props) => props.theme.highlight};
-    box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.16);
+    box-shadow: 0 0 0 2px
+      ${(props) => `color-mix(in srgb, ${props.theme.highlight} 18%, transparent)`};
   }
 `
 
@@ -271,7 +274,7 @@ const LogLevelSummary = styled.summary`
   box-sizing: border-box;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   background-color: ${(props) => props.theme.background};
   cursor: pointer;
@@ -297,9 +300,9 @@ const LogLevelPanel = styled.div`
   z-index: 4;
   min-width: 190px;
   padding: 6px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  background-color: ${(props) => props.theme.surfacePanel};
   box-shadow: 0 18px 36px rgba(15, 15, 25, 0.46);
 `
 
@@ -316,14 +319,14 @@ const LogLevelAction = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: ${(props) => props.theme.backgroundHighlight};
+    background-color: ${(props) => props.theme.surfaceSelected};
   }
 `
 
 const LogLevelDivider = styled.div`
   height: 1px;
   margin: 5px 0;
-  background-color: ${(props) => props.theme.chromeLine};
+  background-color: ${(props) => props.theme.borderSubtle};
 `
 
 const LogLevelOption = styled.label`
@@ -336,7 +339,7 @@ const LogLevelOption = styled.label`
   cursor: pointer;
 
   &:hover {
-    background-color: ${(props) => props.theme.backgroundHighlight};
+    background-color: ${(props) => props.theme.surfaceSelected};
   }
 
   input {
@@ -375,13 +378,13 @@ const EventTable = styled.div`
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  border-right: 1px solid ${(props) => props.theme.chromeLine};
+  border-right: 1px solid ${(props) => props.theme.borderSubtle};
 `
 
 const SplitResizeHandle = styled.div`
   position: relative;
   min-width: 7px;
-  background-color: ${(props) => props.theme.chromeLine};
+  background-color: ${(props) => props.theme.borderSubtle};
   cursor: col-resize;
 
   &::after {
@@ -391,7 +394,7 @@ const SplitResizeHandle = styled.div`
     bottom: 0;
     left: 3px;
     width: 1px;
-    background-color: rgba(122, 162, 247, 0.2);
+    background-color: ${(props) => props.theme.surfaceSelected};
   }
 
   &:hover {
@@ -417,7 +420,7 @@ const TableHeader = styled(TableGrid)`
   display: grid;
   gap: 12px;
   padding: 9px 14px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.backgroundSubtleDark};
   color: ${(props) => props.theme.foregroundDark};
   font-size: 11px;
@@ -476,14 +479,14 @@ const EventRow = styled(TableGrid)<{ $selected: boolean; $tone: ConsoleItem["ton
   border-bottom: 1px solid ${(props) => props.theme.line};
   border-left: 2px solid ${(props) => toneColor(props.$tone)};
   outline: 0;
-  background-color: ${(props) => (props.$selected ? "rgba(122, 162, 247, 0.18)" : "transparent")};
+  background-color: ${(props) => (props.$selected ? props.theme.surfaceSelected : "transparent")};
   color: ${(props) => props.theme.foreground};
   text-align: left;
   cursor: pointer;
 
   &:hover {
     background-color: ${(props) =>
-      props.$selected ? "rgba(122, 162, 247, 0.24)" : props.theme.backgroundSubtleLight};
+      props.$selected ? props.theme.surfaceSelected : props.theme.surfacePanel};
   }
 
   &:hover .row-actions,
@@ -538,7 +541,7 @@ const RowActions = styled.span`
   display: inline-flex;
   align-items: center;
   overflow: hidden;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 6px;
   background-color: ${(props) => props.theme.backgroundSubtleDark};
   transform: translateY(-50%);
@@ -556,11 +559,11 @@ const RowAction = styled.span`
   cursor: pointer;
 
   & + & {
-    border-left: 1px solid ${(props) => props.theme.chromeLine};
+    border-left: 1px solid ${(props) => props.theme.borderSubtle};
   }
 
   &:hover {
-    background-color: ${(props) => props.theme.backgroundHighlight};
+    background-color: ${(props) => props.theme.surfaceSelected};
     color: ${(props) => props.theme.foreground};
   }
 `
@@ -584,7 +587,7 @@ const SourceChip = styled.button`
   padding: 0 6px;
   border: 0;
   border-radius: 4px;
-  background-color: rgba(122, 162, 247, 0.12);
+  background-color: ${(props) => props.theme.surfaceSelected};
   color: ${(props) => props.theme.support};
   font-family: ${monoFont};
   font-size: calc(var(--reactotron-monospace-font-size, 12px) * 0.875);
@@ -594,7 +597,7 @@ const SourceChip = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: rgba(122, 162, 247, 0.24);
+    background-color: ${(props) => props.theme.surfaceSelected};
   }
 `
 
@@ -708,7 +711,7 @@ const Inspector = styled.aside`
 
 const InspectorHeader = styled.div`
   padding: 14px 16px 12px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.background};
 
   @media (max-width: 560px) {
@@ -753,8 +756,8 @@ const ActionBar = styled.div`
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfacePanel};
 
   @media (max-width: 560px) {
     padding: 8px 10px;
@@ -768,7 +771,7 @@ const ActionButton = styled.button`
   gap: 6px;
   min-height: 30px;
   padding: 0 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   background-color: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
@@ -778,7 +781,7 @@ const ActionButton = styled.button`
 
   &:hover {
     border-color: ${(props) => props.theme.foregroundDark};
-    background-color: ${(props) => props.theme.backgroundHighlight};
+    background-color: ${(props) => props.theme.surfaceSelected};
   }
 `
 
@@ -787,7 +790,7 @@ const Tabs = styled.div`
   flex-wrap: wrap;
   gap: 4px;
   padding: 10px 16px 0;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.background};
 
   @media (max-width: 560px) {
@@ -832,7 +835,7 @@ const SectionTitle = styled.h3`
 const FieldGrid = styled.div`
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   overflow: hidden;
   user-select: text;
@@ -840,7 +843,7 @@ const FieldGrid = styled.div`
 
 const FieldLabel = styled.div`
   padding: 8px 10px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.backgroundSubtleDark};
   color: ${(props) => props.theme.foregroundDark};
   font-size: 12px;
@@ -849,14 +852,14 @@ const FieldLabel = styled.div`
 const FieldValue = styled.div`
   min-width: 0;
   padding: 8px 10px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foreground};
   font-size: 12px;
   overflow-wrap: anywhere;
 `
 
 const ViewerContainer = styled.div`
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   overflow: hidden;
   user-select: text;
@@ -869,8 +872,8 @@ const ViewerHeader = styled.div`
   justify-content: space-between;
   gap: 10px;
   padding: 8px 10px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfacePanel};
 `
 
 const ViewerTools = styled.div`
@@ -897,7 +900,7 @@ const ViewerSearch = styled.label`
   max-width: 220px;
   min-height: 28px;
   padding: 0 8px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 6px;
   background-color: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foregroundDark};
@@ -922,10 +925,10 @@ const MatchCount = styled.span`
 const ModeButton = styled.button<{ $active: boolean }>`
   flex: 0 0 auto;
   padding: 4px 8px;
-  border: 1px solid ${(props) => (props.$active ? props.theme.highlight : props.theme.chromeLine)};
+  border: 1px solid ${(props) => (props.$active ? props.theme.highlight : props.theme.borderSubtle)};
   border-radius: 6px;
   background-color: ${(props) =>
-    props.$active ? "rgba(122, 162, 247, 0.18)" : props.theme.background};
+    props.$active ? props.theme.surfaceSelected : props.theme.background};
   color: ${(props) => props.theme.foreground};
   font-size: 11px;
   cursor: pointer;

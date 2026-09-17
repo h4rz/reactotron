@@ -8,9 +8,7 @@ import {
   MdOutlineFeedback as FeedbackIcon,
   MdOutlineNewReleases as ReleaseIcon,
 } from "react-icons/md"
-import { getApplicationKeyMap } from "react-hotkeys"
 import { ItemContainer, ItemIconContainer } from "./SharedStyles"
-import KeybindGroup from "./components/KeybindGroup"
 import { reactotronLogo } from "../../images"
 
 const projectJson = require("../../../../package.json")
@@ -38,7 +36,7 @@ const Title = styled.div`
   margin: 10px 0;
   padding-bottom: 2px;
   color: ${(props) => props.theme.foregroundLight};
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 `
 const ConnectContainer = styled.div`
   display: flex;
@@ -61,27 +59,6 @@ function openUpdates() {
 
 function openTwitter() {
   shell.openExternal("https://twitter.com/reactotron")
-}
-
-function Keybinds() {
-  const keyMap = getApplicationKeyMap()
-
-  const groupedKeyMap = Object.keys(keyMap).reduce((groups, k) => {
-    const keybind = keyMap[k]
-
-    let newGroup = groups.find((g) => g.name === keybind.group)
-
-    if (!newGroup) {
-      newGroup = { name: keybind.group, keybinds: [] }
-      groups.push(newGroup)
-    }
-
-    newGroup.keybinds.push(keybind)
-
-    return groups
-  }, [])
-
-  return groupedKeyMap.map((group) => <KeybindGroup key={group.name} group={group} />)
 }
 
 function Help() {
@@ -119,9 +96,6 @@ function Help() {
             @reactotron
           </ItemContainer>
         </ConnectContainer>
-
-        <Title>Keystrokes</Title>
-        {Keybinds()}
       </HelpContainer>
     </Container>
   )

@@ -43,7 +43,7 @@ const SnapshotDetailRow = styled.div`
   cursor: pointer;
 
   &:hover {
-    background-color: ${(props) => props.theme.backgroundLighter};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 const SnapshotName = styled.div`

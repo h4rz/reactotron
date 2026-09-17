@@ -20,7 +20,7 @@ const TitleContainer = styled.div`
   display: flex;
   margin: 10px 0;
   padding-bottom: 10px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   justify-content: space-between;
   align-items: baseline;
   gap: 20px;
@@ -57,17 +57,17 @@ const DeviceID = styled.div`
 const HighlightedText = styled.div`
   display: inline-block;
   border-radius: 5px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   padding: 2px 5px;
   color: ${(props) => props.theme.support};
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
 `
 const PortSettingsTitle = styled.div`
   font-size: 18px;
   margin: 10px 0;
   padding-bottom: 2px;
   color: ${(props) => props.theme.foregroundLight};
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 `
 const PortSettingsContainer = styled.div`
   display: flex;
@@ -75,8 +75,8 @@ const PortSettingsContainer = styled.div`
   margin-bottom: 10px;
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.chrome};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfaceChrome};
 `
 const PortArgsContainer = styled.div`
   display: flex;
@@ -94,7 +94,7 @@ const ArgName = styled.div`
 const ArgInput = styled.input`
   padding: 10px 12px;
   outline: none;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   width: 100px;
   background-color: ${(props) => props.theme.background};

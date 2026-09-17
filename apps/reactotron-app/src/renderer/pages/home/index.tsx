@@ -34,7 +34,7 @@ const ConnectionContainer = styled.div`
   border-bottom: 1px solid ${(props) => props.theme.line};
 
   &:hover {
-    background-color: ${(props) => props.theme.backgroundLighter};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 const IconContainer = styled.div`

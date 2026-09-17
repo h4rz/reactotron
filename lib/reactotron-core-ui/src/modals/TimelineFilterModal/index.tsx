@@ -49,7 +49,7 @@ const GroupName = styled.div`
   font-size: 18px;
   margin: 10px 0;
   padding-bottom: 2px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foregroundLight};
 `
 

@@ -6,7 +6,10 @@ import {
   MdOutlineList as MdList,
   MdOutlineRemoveCircleOutline as IconStatusCancelled,
 } from "react-icons/md"
-import type { SagaTaskCompleteChild, SagaTaskCompletePayload } from "@hurajgor/reactotron-core-contract"
+import type {
+  SagaTaskCompleteChild,
+  SagaTaskCompletePayload,
+} from "@hurajgor/reactotron-core-contract"
 
 import TimelineCommand from "../../components/TimelineCommand"
 import ContentView from "../../components/ContentView"
@@ -21,7 +24,7 @@ const STATUS_MAP = {
 const EffectTitle = styled.div`
   display: flex;
   color: ${(props) => props.theme.foreground};
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   padding-bottom: 4px;
   margin-bottom: 4px;
 `

@@ -27,9 +27,9 @@ const Keystroke = styled.span`
   font-weight: bold;
   padding: 3px 9px;
   margin: 0 2px;
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foregroundLight};
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 6px;
 `
 const Plus = styled.span`

@@ -16,7 +16,13 @@ import {
 } from "react-icons/md"
 import styled from "styled-components"
 
-import { getDesktopShortcutModifier, isIOSSimulatorSupported } from "../../../platform"
+import { isIOSSimulatorSupported } from "../../../platform"
+import {
+  deviceCommandEvent,
+  formatBindingText,
+  type DeviceCommand,
+  useKeybindings,
+} from "../../keybindings"
 import {
   fitDeviceFrameToPane,
   mapPointToStream,
@@ -71,7 +77,6 @@ const PREVIEW_RETRY_LIMIT = 4
 const IOS_DECODE_QUEUE_LIMIT = 8
 const IOS_FRAME_DURATION_MICROSECONDS = 16_667
 const supportsIOSSimulator = isIOSSimulatorSupported(window.process.platform)
-const shortcutModifier = getDesktopShortcutModifier(window.process.platform)
 
 const Panel = styled.aside<{ $isOpen: boolean; $isResizing: boolean; $width: number }>`
   display: flex;
@@ -80,7 +85,7 @@ const Panel = styled.aside<{ $isOpen: boolean; $isResizing: boolean; $width: num
   width: ${(props) => (props.$isOpen ? `${props.$width}px` : "0")};
   min-width: ${(props) => (props.$isOpen ? "300px" : "0")};
   overflow: hidden;
-  border-left: ${(props) => (props.$isOpen ? `1px solid ${props.theme.chromeLine}` : "0")};
+  border-left: ${(props) => (props.$isOpen ? `1px solid ${props.theme.borderSubtle}` : "0")};
   background-color: ${(props) => props.theme.background};
   transition: ${(props) =>
     props.$isResizing ? "none" : "width 150ms ease, flex-basis 150ms ease"};
@@ -115,7 +120,7 @@ const IconButton = styled.button`
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background-color: ${(props) => props.theme.backgroundLighter};
+    background-color: ${(props) => props.theme.surfaceRaised};
     color: ${(props) => props.theme.foreground};
   }
 
@@ -130,7 +135,7 @@ const RecordingButton = styled(IconButton)<{ $recording: boolean }>`
 
   &:hover:not(:disabled) {
     background: ${(props) =>
-      props.$recording ? "rgb(239 92 98 / 0.16)" : props.theme.backgroundLighter};
+      props.$recording ? "rgb(239 92 98 / 0.16)" : props.theme.surfaceRaised};
     color: ${(props) => (props.$recording ? "#ff7479" : props.theme.foreground)};
   }
 `
@@ -151,8 +156,8 @@ const DeviceBar = styled.div`
   box-sizing: border-box;
   padding: 6px 44px 6px 8px;
   overflow: hidden;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfacePanel};
 `
 
 const ActiveDeviceSelect = styled.select`
@@ -161,10 +166,10 @@ const ActiveDeviceSelect = styled.select`
   flex: 0 0 220px;
   min-width: 0;
   padding: 0 9px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 4px;
   outline: none;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foreground};
   font-size: 12px;
 
@@ -179,7 +184,7 @@ const ToolBar = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: 0 10px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 `
 
 const DeviceName = styled.div`
@@ -247,7 +252,7 @@ const PreviewContainer = styled.div`
     ),
     linear-gradient(
       145deg,
-      ${(props) => props.theme.backgroundLighter} 0%,
+      ${(props) => props.theme.surfaceRaised} 0%,
       ${(props) => props.theme.background} 55%,
       ${(props) => props.theme.backgroundDarker} 100%
     );
@@ -263,6 +268,38 @@ const PreviewContainer = styled.div`
     content: "";
     opacity: 0.35;
     pointer-events: none;
+  }
+`
+
+const KeyboardNotice = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  background: color-mix(in srgb, ${(props) => props.theme.warning} 10%, transparent);
+  color: ${(props) => props.theme.foreground};
+  font-size: 11px;
+  line-height: 16px;
+`
+
+const KeyboardAccessButton = styled.button`
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid ${(props) => props.theme.warning};
+  border-radius: 7px;
+  background: ${(props) => props.theme.surfaceRaised};
+  color: ${(props) => props.theme.foregroundLight};
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+
+  &:focus-visible {
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: 2px;
   }
 `
 
@@ -361,9 +398,9 @@ const ActionSection = styled.div`
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.surfaceRaised};
 `
 
 const ActionLabel = styled.span`
@@ -381,10 +418,10 @@ const DeviceSelect = styled.select`
   width: 100%;
   min-height: 34px;
   padding: 0 9px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 4px;
   outline: none;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foreground};
 `
 
@@ -406,8 +443,8 @@ const PrimaryButton = styled.button`
 `
 
 const SecondaryButton = styled(PrimaryButton)`
-  border-color: ${(props) => props.theme.chromeLine};
-  background: ${(props) => props.theme.backgroundLighter};
+  border-color: ${(props) => props.theme.borderSubtle};
+  background: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foregroundLight};
 `
 
@@ -963,6 +1000,7 @@ function useAndroidVideoStream(
 }
 
 function DeviceSurface({ isOpen }: { isOpen: boolean }) {
+  const { bindings } = useKeybindings()
   const panelRef = useRef<HTMLElement>(null)
   const [previewPane, setPreviewPane] = useState<HTMLDivElement | null>(null)
   const [isResizing, setIsResizing] = useState(false)
@@ -985,6 +1023,11 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const [status, setStatus] = useState("")
   const [isError, setIsError] = useState(false)
   const [isControlConnected, setIsControlConnected] = useState(false)
+  const [keyboardAccess, setKeyboardAccess] = useState<{
+    required: boolean
+    trusted: boolean
+    xcodeMajorVersion: number | null
+  } | null>(null)
   const autoOpenAttemptedRef = useRef(false)
   const controlSocketRef = useRef<WebSocket | null>(null)
   const keyboardTimersRef = useRef<number[]>([])
@@ -1036,6 +1079,29 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     isOpen && isAndroidSurfaceActive && !isChoosing,
     setAndroidScreenSize
   )
+
+  useEffect(() => {
+    if (!isOpen || !activeSurface) return undefined
+    const refresh = () => {
+      ipcRenderer
+        .invoke("ios-simulator-keyboard-access")
+        .then(setKeyboardAccess)
+        .catch(() => setKeyboardAccess(null))
+    }
+    refresh()
+    window.addEventListener("focus", refresh)
+    return () => window.removeEventListener("focus", refresh)
+  }, [activeSurface, isOpen])
+
+  const requestKeyboardAccess = async () => {
+    const result = await ipcRenderer.invoke("ios-simulator-keyboard-access", true)
+    setKeyboardAccess(result)
+    if (!result.trusted) {
+      await ipcRenderer.invoke("open-ios-simulator-keyboard-settings")
+      setStatus("Enable Reactotron in Accessibility, then fully quit and reopen it.")
+      setIsError(true)
+    }
+  }
 
   useEffect(() => {
     if (!previewPane) return undefined
@@ -1171,31 +1237,34 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setIsChoosing(false)
   }
 
-  const runAndroidCommand = async (
-    command:
-      | "home"
-      | "back"
-      | "recents"
-      | "reload"
-      | "reverse"
-      | "tap"
-      | "swipe"
-      | "rotate"
-      | "type",
-    options?: { x?: number; y?: number; endX?: number; endY?: number; text?: string }
-  ) => {
-    if (!activeAndroidDevice) return
-    const result = (await ipcRenderer.invoke(
-      "android-device-command",
-      activeAndroidDevice.id,
-      command,
-      { ...options, port: getConfiguredServerPort() }
-    )) as IPCResponse
-    if (!result.ok) {
-      setStatus(result.message || "The Android device command failed.")
-      setIsError(true)
-    }
-  }
+  const runAndroidCommand = useCallback(
+    async (
+      command:
+        | "home"
+        | "back"
+        | "recents"
+        | "reload"
+        | "reverse"
+        | "tap"
+        | "swipe"
+        | "rotate"
+        | "type",
+      options?: { x?: number; y?: number; endX?: number; endY?: number; text?: string }
+    ) => {
+      if (!activeAndroidDevice) return
+      const result = (await ipcRenderer.invoke(
+        "android-device-command",
+        activeAndroidDevice.id,
+        command,
+        { ...options, port: getConfiguredServerPort() }
+      )) as IPCResponse
+      if (!result.ok) {
+        setStatus(result.message || "The Android device command failed.")
+        setIsError(true)
+      }
+    },
+    [activeAndroidDevice]
+  )
 
   const androidScreenPoint = (event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -1269,13 +1338,13 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setIsAndroidRecording(Boolean(result.recording))
     setStatus(
       result.recording
-        ? `Recording Android video. Press ${shortcutModifier}+R or the red button to stop.`
+        ? `Recording Android video. Press ${formatBindingText(bindings.DeviceRecord)} or the red button to stop.`
         : result.canceled
           ? "Recording discarded."
           : `Saved recording to ${result.filePath}.`
     )
     setIsError(false)
-  }, [activeAndroidDevice])
+  }, [activeAndroidDevice, bindings.DeviceRecord])
 
   const openSurface = useCallback(
     async (udid = selectedUdid) => {
@@ -1380,38 +1449,38 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setStatus("")
   }
 
-  const runSurfaceCommand = async (command: "home" | "landscape_left" | "portrait") => {
-    if (!activeSurface) return
-    const result = (await ipcRenderer.invoke(
-      "ios-simulator-surface-command",
-      activeSurface.udid,
-      command,
-      activeSurface.wsUrl
-    )) as IPCResponse
-    if (!result.ok) {
-      setStatus(result.message || "The simulator command failed.")
-      setIsError(true)
-      return
-    }
-
-    if (command !== "home") {
-      // This only records the next requested rotation. The frame itself follows
-      // the MJPEG dimensions, so an asynchronous stream can never be stretched.
-      setSurfaces((current) =>
-        current.map((surface) =>
-          surface.udid === activeSurface.udid ? { ...surface, orientation: command } : surface
+  const runSurfaceCommand = useCallback(
+    async (command: "home" | "landscape_left" | "portrait") => {
+      if (!activeSurface) return
+      const result = (await ipcRenderer.invoke(
+        "ios-simulator-surface-command",
+        activeSurface.udid,
+        command,
+        activeSurface.wsUrl
+      )) as IPCResponse
+      if (!result.ok) {
+        setStatus(result.message || "The simulator command failed.")
+        setIsError(true)
+        return
+      }
+      if (command !== "home") {
+        setSurfaces((current) =>
+          current.map((surface) =>
+            surface.udid === activeSurface.udid ? { ...surface, orientation: command } : surface
+          )
         )
-      )
-    }
-  }
+      }
+    },
+    [activeSurface]
+  )
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     const result = (await ipcRenderer.invoke("reload-ios-simulator")) as IPCResponse
     setStatus(result.message || (result.ok ? "Reload requested." : "The reload request failed."))
     setIsError(!result.ok)
-  }
+  }, [])
 
-  const reconnect = async () => {
+  const reconnect = useCallback(async () => {
     if (!activeSurface) return
 
     setStatus("Reconnecting simulator preview...")
@@ -1439,7 +1508,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       )
     )
     setStatus("")
-  }
+  }, [activeSurface])
 
   const shutdown = async () => {
     if (!activeSurface) return
@@ -1579,13 +1648,13 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     )
     setStatus(
       result.recording
-        ? `Recording simulator video. Press ${shortcutModifier}+R or the red button to stop.`
+        ? `Recording simulator video. Press ${formatBindingText(bindings.DeviceRecord)} or the red button to stop.`
         : result.canceled
           ? "Recording discarded."
           : `Saved recording to ${result.filePath}.`
     )
     setIsError(false)
-  }, [activeSurface])
+  }, [activeSurface, bindings.DeviceRecord])
 
   const toggleAppearance = useCallback(async () => {
     if (!activeSurface) return
@@ -1602,25 +1671,44 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   }, [activeSurface])
 
   useEffect(() => {
-    const handleShortcut = (_event: unknown, shortcut: string) => {
+    const handleShortcut = (event: Event) => {
+      const shortcut = (event as CustomEvent<DeviceCommand>).detail
       if (activeSurface) {
+        if (shortcut === "home") runSurfaceCommand("home").catch(() => undefined)
+        if (shortcut === "reload") reload().catch(() => undefined)
+        if (shortcut === "reconnect") reconnect().catch(() => undefined)
+        if (shortcut === "rotate") {
+          runSurfaceCommand(
+            activeSurface.orientation === "portrait" ? "landscape_left" : "portrait"
+          ).catch(() => undefined)
+        }
         if (shortcut === "screenshot") takeScreenshot().catch(() => undefined)
         if (shortcut === "record") toggleRecording().catch(() => undefined)
         if (shortcut === "appearance") toggleAppearance().catch(() => undefined)
       }
       if (activeAndroidDevice) {
+        if (shortcut === "home" || shortcut === "back" || shortcut === "recents") {
+          runAndroidCommand(shortcut).catch(() => undefined)
+        }
+        if (shortcut === "reload") runAndroidCommand("reload").catch(() => undefined)
+        if (shortcut === "reconnect") runAndroidCommand("reverse").catch(() => undefined)
+        if (shortcut === "rotate") runAndroidCommand("rotate").catch(() => undefined)
         if (shortcut === "screenshot") takeAndroidScreenshot().catch(() => undefined)
         if (shortcut === "record") toggleAndroidRecording().catch(() => undefined)
       }
     }
 
-    ipcRenderer.on("ios-simulator-shortcut", handleShortcut)
+    window.addEventListener(deviceCommandEvent, handleShortcut)
     return () => {
-      ipcRenderer.removeListener("ios-simulator-shortcut", handleShortcut)
+      window.removeEventListener(deviceCommandEvent, handleShortcut)
     }
   }, [
     activeAndroidDevice,
     activeSurface,
+    reconnect,
+    reload,
+    runAndroidCommand,
+    runSurfaceCommand,
     takeAndroidScreenshot,
     takeScreenshot,
     toggleAndroidRecording,
@@ -1960,7 +2048,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   </IconButton>
                   <IconButton
                     type="button"
-                    title={`Screenshot: copy or save (${shortcutModifier}+S)`}
+                    title={`Screenshot: copy or save (${formatBindingText(bindings.DeviceScreenshot)})`}
                     onClick={() => takeScreenshot().catch(() => undefined)}
                   >
                     <MdScreenshot size={18} />
@@ -1970,8 +2058,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     type="button"
                     title={
                       activeSurface.recording
-                        ? `Stop recording and choose where to save (${shortcutModifier}+R)`
-                        : `Start screen recording (${shortcutModifier}+R)`
+                        ? `Stop recording and choose where to save (${formatBindingText(bindings.DeviceRecord)})`
+                        : `Start screen recording (${formatBindingText(bindings.DeviceRecord)})`
                     }
                     onClick={() => toggleRecording().catch(() => undefined)}
                   >
@@ -1979,6 +2067,20 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   </RecordingButton>
                 </Actions>
               </ToolBar>
+              {keyboardAccess?.required && !keyboardAccess.trusted && (
+                <KeyboardNotice role="status">
+                  <span>
+                    Xcode {keyboardAccess.xcodeMajorVersion} keyboard input needs Accessibility
+                    access. Keep Device Hub visible with this simulator selected.
+                  </span>
+                  <KeyboardAccessButton
+                    type="button"
+                    onClick={() => requestKeyboardAccess().catch(() => undefined)}
+                  >
+                    Enable keyboard
+                  </KeyboardAccessButton>
+                </KeyboardNotice>
+              )}
               <PreviewContainer>
                 <PreviewPane ref={setPreviewPane}>
                   <DeviceFrame
@@ -2071,7 +2173,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   </IconButton>
                   <IconButton
                     type="button"
-                    title={`Screenshot: copy or save (${shortcutModifier}+S)`}
+                    title={`Screenshot: copy or save (${formatBindingText(bindings.DeviceScreenshot)})`}
                     onClick={() => takeAndroidScreenshot().catch(() => undefined)}
                   >
                     <MdScreenshot size={18} />
@@ -2081,8 +2183,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     type="button"
                     title={
                       isAndroidRecording
-                        ? `Stop recording and choose where to save (${shortcutModifier}+R)`
-                        : `Start screen recording (${shortcutModifier}+R)`
+                        ? `Stop recording and choose where to save (${formatBindingText(bindings.DeviceRecord)})`
+                        : `Start screen recording (${formatBindingText(bindings.DeviceRecord)})`
                     }
                     onClick={() => toggleAndroidRecording().catch(() => undefined)}
                   >

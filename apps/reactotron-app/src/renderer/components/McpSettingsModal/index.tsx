@@ -27,7 +27,7 @@ const TagContainer = styled.div`
   gap: 4px;
   margin-bottom: 8px;
   padding: 4px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 4px;
   background-color: ${(props) => props.theme.backgroundSubtleDark};
 `
@@ -40,7 +40,7 @@ const Tag = styled.span`
   border-radius: 3px;
   font-size: 11px;
   font-family: monospace;
-  background-color: ${(props) => props.theme.backgroundHighlight};
+  background-color: ${(props) => props.theme.surfaceSelected};
   color: ${(props) => props.theme.foreground};
 `
 
@@ -58,7 +58,7 @@ const TagRemove = styled.button`
 `
 
 const AddInput = styled.input`
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.backgroundSubtleDark};
   color: ${(props) => props.theme.foreground};
   padding: 4px 8px;
@@ -94,14 +94,14 @@ const ResetButton = styled.button`
   margin-left: auto;
   margin-top: -28px;
   background: none;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 4px;
   color: ${(props) => props.theme.foreground};
   font-size: 12px;
   padding: 4px 10px;
   cursor: pointer;
   &:hover {
-    background-color: ${(props) => props.theme.backgroundHighlight};
+    background-color: ${(props) => props.theme.surfaceSelected};
     border-color: ${(props) => props.theme.foreground};
   }
 `
@@ -116,20 +116,26 @@ interface TagListEditorProps {
 function TagListEditor({ label, placeholder, values, onChange }: TagListEditorProps) {
   const [inputValue, setInputValue] = useState("")
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && inputValue.trim()) {
-      e.preventDefault()
-      const newVal = inputValue.trim()
-      if (!values.includes(newVal)) {
-        onChange([...values, newVal])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && inputValue.trim()) {
+        e.preventDefault()
+        const newVal = inputValue.trim()
+        if (!values.includes(newVal)) {
+          onChange([...values, newVal])
+        }
+        setInputValue("")
       }
-      setInputValue("")
-    }
-  }, [inputValue, values, onChange])
+    },
+    [inputValue, values, onChange]
+  )
 
-  const removeTag = useCallback((index: number) => {
-    onChange(values.filter((_, i) => i !== index))
-  }, [values, onChange])
+  const removeTag = useCallback(
+    (index: number) => {
+      onChange(values.filter((_, i) => i !== index))
+    },
+    [values, onChange]
+  )
 
   return (
     <div>
@@ -168,17 +174,23 @@ export default function McpSettingsModal({ isOpen, onClose, config, onUpdate }: 
     if (isOpen) setLocalConfig(config)
   }, [isOpen, config])
 
-  const updateDefaults = useCallback((patch: Partial<McpRedactionServerConfig["defaults"]>) => {
-    const next = { ...localConfig, defaults: { ...localConfig.defaults, ...patch } }
-    setLocalConfig(next)
-    onUpdate(next)
-  }, [localConfig, onUpdate])
+  const updateDefaults = useCallback(
+    (patch: Partial<McpRedactionServerConfig["defaults"]>) => {
+      const next = { ...localConfig, defaults: { ...localConfig.defaults, ...patch } }
+      setLocalConfig(next)
+      onUpdate(next)
+    },
+    [localConfig, onUpdate]
+  )
 
-  const updatePermission = useCallback((key: "allowClientDisable" | "allowClientRemoveRules", value: boolean) => {
-    const next = { ...localConfig, [key]: value }
-    setLocalConfig(next)
-    onUpdate(next)
-  }, [localConfig, onUpdate])
+  const updatePermission = useCallback(
+    (key: "allowClientDisable" | "allowClientRemoveRules", value: boolean) => {
+      const next = { ...localConfig, [key]: value }
+      setLocalConfig(next)
+      onUpdate(next)
+    },
+    [localConfig, onUpdate]
+  )
 
   const resetToDefaults = useCallback(() => {
     setLocalConfig(DEFAULT_SERVER_CONFIG)
@@ -190,7 +202,9 @@ export default function McpSettingsModal({ isOpen, onClose, config, onUpdate }: 
       <ResetButton onClick={resetToDefaults}>Reset to defaults</ResetButton>
       <Section>
         <SectionTitle>Sensitive Keys</SectionTitle>
-        <Description>Field and HTTP header names redacted wherever found in payloads (case-insensitive)</Description>
+        <Description>
+          Field and HTTP header names redacted wherever found in payloads (case-insensitive)
+        </Description>
         <TagListEditor
           label=""
           placeholder="Type key or header name and press Enter"
@@ -201,7 +215,9 @@ export default function McpSettingsModal({ isOpen, onClose, config, onUpdate }: 
 
       <Section>
         <SectionTitle>State Path Patterns</SectionTitle>
-        <Description>Dot-separated paths to redact in state (supports trailing wildcard, e.g. auth.tokens.*)</Description>
+        <Description>
+          Dot-separated paths to redact in state (supports trailing wildcard, e.g. auth.tokens.*)
+        </Description>
         <TagListEditor
           label=""
           placeholder="Type state path and press Enter"

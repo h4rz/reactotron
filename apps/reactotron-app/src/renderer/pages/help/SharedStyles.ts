@@ -9,14 +9,14 @@ export const ItemContainer = styled.div`
   padding: 12px 10px;
   margin: 5px;
   flex: 1;
-  background-color: ${(props) => props.theme.chrome};
+  background-color: ${(props) => props.theme.surfaceChrome};
   border-radius: 8px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foreground};
 
   &:hover {
     border-color: ${(props) => props.theme.highlight};
-    background-color: ${(props) => props.theme.backgroundLighter};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 export const ItemIconContainer = styled.div`

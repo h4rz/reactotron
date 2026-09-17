@@ -15,7 +15,7 @@ const KeysContainer = styled.div`
   color: ${(props) => props.theme.foreground};
 `
 const Key = styled.div`
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
   margin: 4px;
   padding: 4px 8px;
   border-radius: 4px;

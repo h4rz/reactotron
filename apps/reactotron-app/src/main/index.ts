@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain } from "electron"
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Notification,
+  shell,
+  systemPreferences,
+} from "electron"
+import { execFile } from "child_process"
 import path from "path"
 import { format as formatUrl } from "url"
 import log from "electron-log"
@@ -39,12 +48,104 @@ ipcMain.on("get-runtime-config", (event) => {
 })
 
 class AppUpdater {
-  constructor() {
+  private manualCheck = false
+  private restartPromptOpen = false
+
+  constructor(private readonly window: BrowserWindow) {
     log.transports.file.level = "debug"
     autoUpdater.logger = log
-    autoUpdater.checkForUpdatesAndNotify()
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on("download-progress", ({ percent }) => {
+      if (!this.window.isDestroyed()) this.window.setProgressBar(percent / 100)
+    })
+    autoUpdater.on("update-available", ({ version }) => {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: `Reactotron ${version} is available`,
+          body: "Downloading in the background. Reactotron will let you know when it is ready.",
+        }).show()
+      }
+      this.manualCheck = false
+    })
+    autoUpdater.on("update-not-available", () => {
+      if (!this.manualCheck || this.window.isDestroyed()) return
+      this.manualCheck = false
+      dialog.showMessageBox(this.window, {
+        type: "info",
+        title: "Reactotron is up to date",
+        message: `You are using the latest version of Reactotron (${app.getVersion()}).`,
+        buttons: ["OK"],
+      })
+    })
+    autoUpdater.on("update-downloaded", ({ version }) => {
+      if (!this.window.isDestroyed()) this.window.setProgressBar(-1)
+      if (this.restartPromptOpen || this.window.isDestroyed()) return
+      this.restartPromptOpen = true
+      dialog
+        .showMessageBox(this.window, {
+          type: "info",
+          title: "Update ready",
+          message: `Reactotron ${version} is ready to install.`,
+          detail:
+            "Restart now to finish the update, or choose Later to install when Reactotron quits.",
+          buttons: ["Restart Now", "Later"],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
+        })
+        .then(({ response }) => {
+          this.restartPromptOpen = false
+          if (response === 0) autoUpdater.quitAndInstall(false, true)
+        })
+    })
+    autoUpdater.on("error", (error) => {
+      if (!this.window.isDestroyed()) this.window.setProgressBar(-1)
+      log.error("Reactotron update failed", error)
+    })
+  }
+
+  checkForUpdates(manual = false) {
+    this.manualCheck = manual
+    autoUpdater.checkForUpdates().catch((error) => {
+      if (!manual || this.window.isDestroyed()) return
+      this.manualCheck = false
+      dialog.showMessageBox(this.window, {
+        type: "error",
+        title: "Could not check for updates",
+        message: "Reactotron could not reach the update server.",
+        detail: error instanceof Error ? error.message : String(error),
+        buttons: ["OK"],
+      })
+    })
   }
 }
+
+function getXcodeMajorVersion(): Promise<number | null> {
+  return new Promise((resolve) => {
+    execFile("/usr/bin/xcodebuild", ["-version"], (error, stdout) => {
+      if (error) return resolve(null)
+      const match = stdout.match(/^Xcode\s+(\d+)/m)
+      resolve(match ? Number(match[1]) : null)
+    })
+  })
+}
+
+ipcMain.handle("ios-simulator-keyboard-access", async (_event, prompt = false) => {
+  if (!isMacOS) return { required: false, trusted: true, xcodeMajorVersion: null }
+  const xcodeMajorVersion = await getXcodeMajorVersion()
+  const required = xcodeMajorVersion !== null && xcodeMajorVersion >= 27
+  const trusted = required ? systemPreferences.isTrustedAccessibilityClient(Boolean(prompt)) : true
+  return { required, trusted, xcodeMajorVersion }
+})
+
+ipcMain.handle("open-ios-simulator-keyboard-settings", async () => {
+  await shell.openExternal(
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+  )
+  return { ok: true }
+})
 
 let mainWindow: BrowserWindow | null
 
@@ -115,28 +216,9 @@ function createMainWindow() {
     window.webContents.reload()
   })
 
-  window.webContents.on("before-input-event", (event, input) => {
-    const hasPlatformModifier = isMacOS ? input.meta : input.control
-    if (input.type !== "keyDown" || !hasPlatformModifier) return
-
-    const key = input.key.toLowerCase()
-    const shortcut =
-      input.shift && key === "a"
-        ? "appearance"
-        : key === "s"
-          ? "screenshot"
-          : key === "r"
-            ? "record"
-            : null
-    if (!shortcut) return
-
-    event.preventDefault()
-    window.webContents.send("ios-simulator-shortcut", shortcut)
-  })
-
-  createMenu(window, isDevelopment)
-
-  new AppUpdater() // eslint-disable-line no-new
+  const appUpdater = isDevelopment ? null : new AppUpdater(window)
+  createMenu(window, isDevelopment, appUpdater ? () => appUpdater.checkForUpdates(true) : undefined)
+  appUpdater?.checkForUpdates()
 
   return window
 }

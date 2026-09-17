@@ -34,9 +34,9 @@ const DropZone = styled.div`
   flex: 1;
   height: 200px;
   width: 200px;
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  background-color: ${(props) => props.theme.surfacePanel};
   border-radius: 8px;
-  border: 1px dashed ${(props) => props.theme.chromeLine};
+  border: 1px dashed ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foregroundDark};
   justify-content: center;
   align-items: center;

@@ -33,7 +33,7 @@ const HeaderTabButtonContainer = styled.div.attrs(() => ({}))<HeaderTabButtonPro
     background-color: ${(props) =>
       props.$colorAnimation > 0.5
         ? `color-mix(in srgb, ${props.theme.highlight} 18%, transparent)`
-        : props.theme.backgroundLighter};
+        : props.theme.surfaceRaised};
   }
 `
 

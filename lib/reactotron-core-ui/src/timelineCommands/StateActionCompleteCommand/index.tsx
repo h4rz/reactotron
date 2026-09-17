@@ -23,7 +23,7 @@ const TabItem = styled.div<{ $active: boolean }>`
   cursor: pointer;
   padding-right: 8px;
   padding-left: 8px;
-  border-right: 1px solid ${(props) => props.theme.chromeLine};
+  border-right: 1px solid ${(props) => props.theme.borderSubtle};
   :last-child {
     border-right: none;
   }
@@ -35,7 +35,7 @@ const Tab = styled.div`
   display: flex;
   padding: 10px;
 
-  border-bottom: 1px solid ${({ theme }) => theme.chromeLine};
+  border-bottom: 1px solid ${({ theme }) => theme.borderSubtle};
 `
 
 interface StateActionCompletePayload {

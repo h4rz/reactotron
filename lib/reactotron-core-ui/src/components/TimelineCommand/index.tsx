@@ -17,11 +17,11 @@ const Container = styled.div.attrs(() => ({}))<ContainerProps>`
   flex-direction: column;
   border-bottom: ${(props) => `1px solid ${props.theme.line}`};
   background-color: ${(props) =>
-    props.$isOpen ? props.theme.backgroundSubtleLight : props.theme.background};
+    props.$isOpen ? props.theme.surfacePanel : props.theme.background};
 
   &:hover {
     background-color: ${(props) =>
-      props.$isOpen ? props.theme.backgroundSubtleLight : props.theme.backgroundLighter};
+      props.$isOpen ? props.theme.surfacePanel : props.theme.surfaceRaised};
   }
 `
 

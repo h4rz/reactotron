@@ -8,7 +8,7 @@ import type { ChangeEvent } from "react"
 const Input = styled.input`
   margin-right: 4px;
   width: 45px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   padding: 8px 5px;
   font-size: 13px;

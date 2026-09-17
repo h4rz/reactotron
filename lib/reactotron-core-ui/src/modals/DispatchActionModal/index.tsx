@@ -23,7 +23,7 @@ const ActionLabel = styled.label`
   color: ${(props) => props.theme.heading};
 `
 const ActionInput = styled.textarea`
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   padding: 10px;
   font-size: 14px;

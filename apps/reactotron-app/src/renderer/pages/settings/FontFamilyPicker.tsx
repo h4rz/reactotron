@@ -23,7 +23,7 @@ const Trigger = styled.button`
   justify-content: space-between;
   gap: 8px;
   padding: 0 10px 0 11px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
@@ -62,16 +62,16 @@ const Popup = styled.div`
   max-width: min(290px, calc(100vw - 48px));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 10px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.surfaceRaised};
   box-shadow: 0 16px 40px ${(props) => props.theme.glow};
 `
 
 const SearchWrap = styled.div`
   position: relative;
   margin: 10px 12px 4px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 
   svg {
     position: absolute;
@@ -125,8 +125,7 @@ const FontOption = styled.button<{ $isHighlighted: boolean; $top: number }>`
   padding: 5px 9px;
   border: 0;
   border-radius: 7px;
-  background: ${(props) =>
-    props.$isHighlighted ? props.theme.backgroundHighlight : "transparent"};
+  background: ${(props) => (props.$isHighlighted ? props.theme.surfaceSelected : "transparent")};
   color: ${(props) => props.theme.foreground};
   cursor: pointer;
   font-size: 15px;
@@ -147,7 +146,7 @@ const FontOption = styled.button<{ $isHighlighted: boolean; $top: number }>`
   }
 
   &:hover {
-    background: ${(props) => props.theme.backgroundHighlight};
+    background: ${(props) => props.theme.surfaceSelected};
   }
 `
 

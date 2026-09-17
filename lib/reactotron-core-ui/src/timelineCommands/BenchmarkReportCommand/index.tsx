@@ -32,7 +32,7 @@ interface StepGrapProps {
   $endPercent: number
 }
 const StepGraph = styled.div.attrs(() => ({}))<StepGrapProps>`
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
   position: absolute;
   top: 0;
   bottom: 0;

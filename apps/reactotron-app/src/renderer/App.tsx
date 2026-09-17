@@ -59,7 +59,7 @@ const PanelToggle = styled.button<{ $isOpen: boolean }>`
   place-items: center;
   border: 0;
   border-radius: 4px;
-  background: ${(props) => (props.$isOpen ? props.theme.backgroundLighter : "transparent")};
+  background: ${(props) => (props.$isOpen ? props.theme.surfaceRaised : "transparent")};
   color: ${(props) => props.theme.foregroundDark};
   cursor: pointer;
   -webkit-app-region: no-drag;

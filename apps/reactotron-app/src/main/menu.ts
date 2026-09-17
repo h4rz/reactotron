@@ -151,10 +151,16 @@ function buildWindowMenu(window: Electron.BrowserWindow) {
   }
 }
 
-function buildHelpMenu() {
+function buildHelpMenu(checkForUpdates?: () => void) {
   return {
     label: "Help",
     submenu: [
+      {
+        label: "Check for Updates…",
+        enabled: Boolean(checkForUpdates),
+        click: () => checkForUpdates?.(),
+      },
+      { type: "separator" },
       {
         label: "Visit on GitHub",
         click: () => {
@@ -165,13 +171,17 @@ function buildHelpMenu() {
   }
 }
 
-export default function createMenu(window: Electron.BrowserWindow, isDevelopment: boolean) {
+export default function createMenu(
+  window: Electron.BrowserWindow,
+  isDevelopment: boolean,
+  checkForUpdates?: () => void
+) {
   const template = [
     buildFileMenu(),
     buildEditMenu(),
     buildViewMenu(window, isDevelopment),
     buildWindowMenu(window),
-    buildHelpMenu(),
+    buildHelpMenu(checkForUpdates),
   ]
 
   const menu = Menu.buildFromTemplate(template.filter((t) => !!t) as any)

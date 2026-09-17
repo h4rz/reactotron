@@ -26,7 +26,23 @@ interface ReactotronTheme {
   tag: string
   tagComplement: string
   warning: string
+  surfaceChrome: string
+  surfacePanel: string
+  surfaceRaised: string
+  surfaceSelected: string
+  surfaceStatus: string
+  borderSubtle: string
 }
+
+type BaseReactotronTheme = Omit<
+  ReactotronTheme,
+  | "surfaceChrome"
+  | "surfacePanel"
+  | "surfaceRaised"
+  | "surfaceSelected"
+  | "surfaceStatus"
+  | "borderSubtle"
+>
 
 const themeNames = [
   "tokyoNight",
@@ -89,7 +105,7 @@ const themeVariants: Record<ThemeStyle, { dark: ThemeName; light: ThemeName }> =
   iris: { dark: "irisDark", light: "irisLight" },
 }
 
-const themes: Record<ThemeName, ReactotronTheme> = {
+const baseThemes: Record<ThemeName, BaseReactotronTheme> = {
   tokyoNight: {
     fontFamily:
       '"JetBrains Mono", "SF Mono", "Fira Code", "Consolas", "Segoe UI", "Roboto", "-apple-system", "Helvetica Neue", sans-serif',
@@ -931,6 +947,21 @@ const themes: Record<ThemeName, ReactotronTheme> = {
     warning: "#df8e1d",
   },
 }
+
+const themes = Object.fromEntries(
+  Object.entries(baseThemes).map(([name, theme]) => [
+    name,
+    {
+      ...theme,
+      surfaceChrome: `color-mix(in srgb, ${theme.background} 95%, ${theme.foreground})`,
+      surfacePanel: `color-mix(in srgb, ${theme.background} 97%, ${theme.foreground})`,
+      surfaceRaised: `color-mix(in srgb, ${theme.background} 93%, ${theme.foreground})`,
+      surfaceSelected: `color-mix(in srgb, ${theme.background} 84%, ${theme.highlight})`,
+      surfaceStatus: `color-mix(in srgb, ${theme.backgroundDarker} 97%, ${theme.foreground})`,
+      borderSubtle: `color-mix(in srgb, ${theme.background} 86%, ${theme.foreground})`,
+    },
+  ])
+) as Record<ThemeName, ReactotronTheme>
 
 export { themes, themeNames, themeStyles, themeVariants }
 export type { ReactotronTheme, ThemeName, ThemeStyle }

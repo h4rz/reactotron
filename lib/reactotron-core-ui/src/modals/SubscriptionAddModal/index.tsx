@@ -22,7 +22,7 @@ const PathLabel = styled.label`
   color: ${(props) => props.theme.heading};
 `
 const PathInput = styled.input`
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   padding: 0 10px;
   font-size: 14px;

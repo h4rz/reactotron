@@ -19,7 +19,7 @@ import { McpStatus } from "../../contexts/Standalone"
 import ConnectionSelector from "../ConnectionSelector"
 
 const Container = styled.div`
-  border-top: 1px solid ${(props) => props.theme.chromeLine};
+  border-top: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foregroundDark};
   box-shadow: 0 0 30px ${(props) => props.theme.glow};
   color: ${(props) => props.theme.foregroundLight};
@@ -41,7 +41,7 @@ const ContentContainer = styled.div.attrs(() => ({}))<ContentContainerProps>`
   position: relative;
   display: flex;
   flex-direction: row;
-  background-color: ${(props) => props.theme.subtleLine};
+  background-color: ${(props) => props.theme.surfaceStatus};
   padding: 0 350px 0 12px;
   justify-content: space-between;
   align-items: center;
@@ -84,8 +84,8 @@ const ReloadButton = styled.button`
   height: 22px;
   padding: 0 8px;
   border-radius: 4px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
-  background-color: ${(props) => props.theme.backgroundLighter};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
+  background-color: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foregroundDark};
   font-size: 11px;
   line-height: 1;
@@ -150,7 +150,7 @@ const McpButton = styled.div.attrs(() => ({}))<McpButtonProps>`
     ${(props) =>
       props.$active
         ? `color-mix(in srgb, ${props.theme.highlight} 40%, transparent)`
-        : props.theme.chromeLine};
+        : props.theme.borderSubtle};
   color: ${(props) => (props.$active ? props.theme.highlight : props.theme.foregroundDark)};
   &:hover {
     background-color: ${(props) =>

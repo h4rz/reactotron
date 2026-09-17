@@ -52,7 +52,7 @@ const SearchInput = styled.input`
   padding: 10px;
   flex: 1;
   background-color: ${(props) => props.theme.background};
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foreground};
   font-size: 14px;
 `
@@ -63,10 +63,10 @@ const QuickStartButtonContainer = styled.div`
   display: flex;
   padding: 4px 8px;
   margin: 30px 20px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   cursor: pointer;
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.highlight};
   align-items: center;
   justify-content: center;
@@ -74,7 +74,7 @@ const QuickStartButtonContainer = styled.div`
 `
 const Divider = styled.div`
   height: 1px;
-  background-color: ${(props) => props.theme.chromeLine};
+  background-color: ${(props) => props.theme.borderSubtle};
   margin: 40px 10px;
 `
 

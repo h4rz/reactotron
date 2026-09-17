@@ -5,8 +5,8 @@ import ActionButton from "../ActionButton"
 import HeaderTabButton from "../HeaderTabButton"
 
 const Container = styled.div`
-  background-color: ${(props) => props.theme.backgroundSubtleDark};
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  background-color: ${(props) => props.theme.surfaceChrome};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foregroundDark};
 `
 

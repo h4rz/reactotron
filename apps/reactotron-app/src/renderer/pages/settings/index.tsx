@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from "react"
 import { Header, themes, themeVariants, type ThemeStyle } from "@hurajgor/reactotron-core-ui"
-import { LuMoon, LuPalette, LuSettings2, LuSun } from "react-icons/lu"
+import { LuKeyboard, LuMoon, LuPalette, LuSettings2, LuSun } from "react-icons/lu"
 import styled from "styled-components"
 
 import AppPreferencesContext, {
@@ -11,6 +11,7 @@ import AppPreferencesContext, {
 } from "../../contexts/AppPreferences"
 import { resolveInterfaceFont, resolveMonospaceFont } from "../../typography"
 import FontFamilyPicker from "./FontFamilyPicker"
+import KeybindingsSettings from "./KeybindingsSettings"
 
 const Container = styled.div`
   display: flex;
@@ -67,11 +68,14 @@ const SettingsNavButton = styled.button<{ $isActive: boolean }>`
   align-items: center;
   gap: 9px;
   width: 100%;
-  min-height: 36px;
-  padding: 0 11px;
-  border: 1px solid ${(props) => (props.$isActive ? props.theme.chromeLine : "transparent")};
-  border-radius: 8px;
-  background: ${(props) => (props.$isActive ? props.theme.backgroundLighter : "transparent")};
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: ${(props) =>
+    props.$isActive
+      ? `color-mix(in srgb, ${props.theme.highlight} 24%, transparent)`
+      : "transparent"};
   color: ${(props) => (props.$isActive ? props.theme.foregroundLight : props.theme.foregroundDark)};
   cursor: pointer;
   font: inherit;
@@ -87,7 +91,10 @@ const SettingsNavButton = styled.button<{ $isActive: boolean }>`
   }
 
   &:hover {
-    background: ${(props) => props.theme.backgroundSubtleLight};
+    background: ${(props) =>
+      props.$isActive
+        ? `color-mix(in srgb, ${props.theme.highlight} 28%, transparent)`
+        : `color-mix(in srgb, ${props.theme.foreground} 6%, transparent)`};
     color: ${(props) => props.theme.foreground};
   }
 
@@ -127,7 +134,7 @@ const PageDescription = styled.p`
 const AppearanceSection = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 `
 
 const SectionLabel = styled.h2`
@@ -141,7 +148,7 @@ const SectionLabel = styled.h2`
 const AppearanceOptions = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 
   @media (max-width: 680px) {
     grid-template-columns: 1fr;
@@ -151,12 +158,16 @@ const AppearanceOptions = styled.div`
 const SchemeOption = styled.label<{ $isActive: boolean }>`
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 7px;
   min-width: 0;
-  padding: 10px;
-  border: 1px solid ${(props) => (props.$isActive ? props.theme.highlight : props.theme.chromeLine)};
+  padding: 8px;
+  border: 1px solid
+    ${(props) => (props.$isActive ? props.theme.highlight : props.theme.borderSubtle)};
   border-radius: 12px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) =>
+    props.$isActive
+      ? `color-mix(in srgb, ${props.theme.highlight} 7%, ${props.theme.background})`
+      : props.theme.background};
   color: ${(props) => (props.$isActive ? props.theme.foregroundLight : props.theme.foreground)};
   cursor: pointer;
   font-size: 13px;
@@ -189,9 +200,9 @@ const SchemeOption = styled.label<{ $isActive: boolean }>`
 const SchemePreview = styled.span<{ $appearance: ThemeAppearance }>`
   position: relative;
   display: block;
-  height: 70px;
+  height: 58px;
   overflow: hidden;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
   background: ${(props) => {
     if (props.$appearance === "light") return "#f5f7fa"
@@ -230,7 +241,7 @@ const SchemePreview = styled.span<{ $appearance: ThemeAppearance }>`
 const ThemeGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 
   @media (max-width: 900px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -245,14 +256,18 @@ const ThemeCard = styled.div<{ $isActive: boolean }>`
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 112px;
+  min-height: 88px;
   flex-direction: column;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 15px 13px;
-  border: 1px solid ${(props) => (props.$isActive ? props.theme.highlight : props.theme.chromeLine)};
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid
+    ${(props) => (props.$isActive ? props.theme.highlight : props.theme.borderSubtle)};
   border-radius: 12px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) =>
+    props.$isActive
+      ? `color-mix(in srgb, ${props.theme.highlight} 7%, ${props.theme.background})`
+      : props.theme.background};
   color: ${(props) => props.theme.foreground};
   text-align: left;
   box-shadow: ${(props) =>
@@ -266,7 +281,8 @@ const ThemeCard = styled.div<{ $isActive: boolean }>`
 
   &:hover {
     border-color: ${(props) => props.theme.highlight};
-    background: ${(props) => props.theme.backgroundSubtleLight};
+    background: ${(props) =>
+      `color-mix(in srgb, ${props.theme.highlight} 5%, ${props.theme.background})`};
     transform: translateY(-1px);
   }
 
@@ -312,8 +328,8 @@ const ThemeOrb = styled.button<{
   $isActive: boolean
 }>`
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   padding: 3px;
   border: 0;
   border-radius: 50%;
@@ -362,7 +378,7 @@ const OrbModeBadge = styled.span`
   width: 18px;
   height: 18px;
   place-items: center;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 50%;
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
@@ -420,17 +436,17 @@ const TypographyHeader = styled.div`
 
 const TypographyPanel = styled.div`
   overflow: visible;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 12px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.background};
 `
 
 const TypographyRow = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(250px, 330px);
-  gap: 14px 24px;
-  padding: 17px 20px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  gap: 10px 20px;
+  padding: 13px 16px;
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 
   &:last-child {
     border-bottom: 0;
@@ -466,7 +482,7 @@ const TypographySelect = styled.select`
   min-width: 0;
   height: 36px;
   padding: 0 30px 0 11px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
@@ -485,7 +501,7 @@ const FontPreview = styled.div<{ $family: string; $size: number; $monospace?: bo
   min-width: 0;
   overflow: hidden;
   padding: 12px 14px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
@@ -510,9 +526,9 @@ const SmoothingControl = styled.label`
 
 const PreferencesPanel = styled.section`
   overflow: hidden;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 12px;
-  background: ${(props) => props.theme.backgroundLighter};
+  background: ${(props) => props.theme.background};
 `
 
 const PreferenceSection = styled.div`
@@ -522,7 +538,7 @@ const PreferenceSection = styled.div`
   align-items: center;
   min-height: 82px;
   padding: 17px 20px;
-  border-bottom: 1px solid ${(props) => props.theme.chromeLine};
+  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
 
   &:last-child {
     border-bottom: 0;
@@ -554,7 +570,7 @@ const NumberInput = styled.input`
   box-sizing: border-box;
   color: ${(props) => props.theme.foreground};
   background-color: ${(props) => props.theme.background};
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   font-size: 13px;
 
@@ -596,7 +612,7 @@ const ToggleTrack = styled.span<{ $isEnabled: boolean }>`
   flex: 0 0 44px;
   padding: 2px;
   border: 1px solid
-    ${(props) => (props.$isEnabled ? props.theme.highlight : props.theme.chromeLine)};
+    ${(props) => (props.$isEnabled ? props.theme.highlight : props.theme.borderSubtle)};
   border-radius: 999px;
   background-color: ${(props) =>
     props.$isEnabled
@@ -663,7 +679,9 @@ function Settings() {
     setFontSmoothing,
   } = useContext(TypographyPreferencesContext)
 
-  const [activeSection, setActiveSection] = useState<"general" | "appearance">("appearance")
+  const [activeSection, setActiveSection] = useState<"general" | "appearance" | "keybindings">(
+    "appearance"
+  )
   const [maxCommandsDraft, setMaxCommandsDraft] = useState(String(maxCommands))
   const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform)
 
@@ -706,15 +724,32 @@ function Settings() {
               <LuPalette aria-hidden="true" />
               Appearance
             </SettingsNavButton>
+            <SettingsNavButton
+              type="button"
+              $isActive={activeSection === "keybindings"}
+              aria-current={activeSection === "keybindings" ? "page" : undefined}
+              onClick={() => setActiveSection("keybindings")}
+            >
+              <LuKeyboard aria-hidden="true" />
+              Keybindings
+            </SettingsNavButton>
           </SettingsNav>
 
           <SettingsPane>
             <Intro>
-              <PageTitle>{activeSection === "appearance" ? "Appearance" : "General"}</PageTitle>
+              <PageTitle>
+                {activeSection === "appearance"
+                  ? "Appearance"
+                  : activeSection === "keybindings"
+                    ? "Keybindings"
+                    : "General"}
+              </PageTitle>
               <PageDescription>
                 {activeSection === "appearance"
                   ? "Choose independent light and dark palettes, then follow your system or lock either appearance."
-                  : "Tune Reactotron for long debugging sessions. Changes apply immediately."}
+                  : activeSection === "keybindings"
+                    ? "Customize Reactotron and device controls. Changes apply immediately."
+                    : "Tune Reactotron for long debugging sessions. Changes apply immediately."}
               </PageDescription>
             </Intro>
 
@@ -767,7 +802,7 @@ function Settings() {
                               aria-pressed={lightIsActive}
                               $isActive={lightIsActive}
                               $background={lightTheme.background}
-                              $surface={lightTheme.backgroundLighter}
+                              $surface={lightTheme.surfaceRaised}
                               $accent={lightTheme.highlight}
                               $foreground={lightTheme.foreground}
                               onClick={(event) => {
@@ -787,7 +822,7 @@ function Settings() {
                               aria-pressed={darkIsActive}
                               $isActive={darkIsActive}
                               $background={darkTheme.background}
-                              $surface={darkTheme.backgroundLighter}
+                              $surface={darkTheme.surfaceRaised}
                               $accent={darkTheme.highlight}
                               $foreground={darkTheme.foreground}
                               onClick={(event) => {
@@ -901,6 +936,8 @@ function Settings() {
                   </TypographyPanel>
                 </AppearanceSection>
               </>
+            ) : activeSection === "keybindings" ? (
+              <KeybindingsSettings />
             ) : (
               <AppearanceSection>
                 <SectionLabel>Interface</SectionLabel>

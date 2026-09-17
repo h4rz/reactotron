@@ -36,7 +36,7 @@ const SearchInput = styled.input`
   padding: 10px;
   flex: 1;
   background-color: ${(props) => props.theme.background};
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   color: ${(props) => props.theme.foreground};
   font-size: 14px;
 `
@@ -47,9 +47,9 @@ const ButtonContianer = styled.div`
   width: 100%;
   margin-bottom: 24px;
   padding: 16px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 8px;
-  background-color: ${(props) => props.theme.backgroundSubtleLight};
+  background-color: ${(props) => props.theme.surfacePanel};
   color: ${(props) => props.theme.foreground};
 `
 const Title = styled.div`
@@ -69,8 +69,8 @@ const SendButton = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(122, 162, 247, 0.14);
-  border: 1px solid rgba(122, 162, 247, 0.4);
+  background-color: ${(props) => props.theme.surfaceSelected};
+  border: 1px solid ${(props) => `color-mix(in srgb, ${props.theme.highlight} 42%, transparent)`};
   border-radius: 7px;
   width: 170px;
   min-height: 36px;
@@ -82,7 +82,8 @@ const SendButton = styled.div`
   transition: background-color 0.25s ease-in-out;
 
   &:hover {
-    background-color: rgba(122, 162, 247, 0.22);
+    background-color: ${(props) =>
+      `color-mix(in srgb, ${props.theme.background} 76%, ${props.theme.highlight})`};
   }
 `
 const ArgContainer = styled.div`
@@ -98,7 +99,7 @@ const ArgInput = styled.input`
   outline: none;
   border-radius: 7px;
   width: 90%;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   background-color: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
   font-size: 13px;

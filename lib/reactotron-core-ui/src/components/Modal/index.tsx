@@ -23,9 +23,9 @@ export const KeystrokeContainer = styled.div`
 `
 export const Keystroke = styled.span`
   padding: 3px 8px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 6px;
-  background-color: ${(props) => props.theme.backgroundLighter};
+  background-color: ${(props) => props.theme.surfaceRaised};
   color: ${(props) => props.theme.foregroundLight};
 `
 
@@ -65,9 +65,9 @@ const Modal: FunctionComponent<React.PropsWithChildren<Props>> = ({
           flexDirection: "column",
           borderRadius: 8,
           padding: 20,
-          backgroundColor: theme.backgroundSubtleLight,
+          backgroundColor: theme.surfacePanel,
           color: theme.foreground,
-          borderColor: theme.chromeLine,
+          borderColor: theme.borderSubtle,
           width: 500,
           position: "auto" as any, // TODO: Fix this!
           top: "auto",

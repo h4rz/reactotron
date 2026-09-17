@@ -28,8 +28,8 @@ const SideBarContainer = styled.div.attrs(() => ({}))<SideBarContainerProps>`
   flex-direction: column;
   gap: 4px;
   padding-top: ${(props) => (props.$mode === "compact" ? 10 : 14)}px;
-  background-color: ${(props) => props.theme.backgroundSubtleDark};
-  border-right: 1px solid ${(props) => props.theme.chromeLine};
+  background-color: ${(props) => props.theme.surfaceChrome};
+  border-right: 1px solid ${(props) => props.theme.borderSubtle};
   width: ${(props) => (props.$mode === "compact" ? 54 : 104)}px;
   flex: 0 0 ${(props) => (props.$mode === "compact" ? 54 : 104)}px;
   transition:
@@ -65,8 +65,8 @@ const SideBarToolButton = styled.button`
 
   &:hover {
     color: ${(props) => props.theme.foreground};
-    border-color: ${(props) => props.theme.chromeLine};
-    background-color: ${(props) => props.theme.backgroundLighter};
+    border-color: ${(props) => props.theme.borderSubtle};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 

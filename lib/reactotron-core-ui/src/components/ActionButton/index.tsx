@@ -18,8 +18,8 @@ const Container = styled.div`
 
   &:hover {
     color: ${(props) => props.theme.highlight};
-    border-color: ${(props) => props.theme.chromeLine};
-    background-color: ${(props) => props.theme.backgroundLighter};
+    border-color: ${(props) => props.theme.borderSubtle};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 

@@ -47,13 +47,13 @@ const RadioButton = styled.div`
   gap: 6px;
   cursor: pointer;
   padding: 8px 10px;
-  border: 1px solid ${(props) => props.theme.chromeLine};
+  border: 1px solid ${(props) => props.theme.borderSubtle};
   border-radius: 7px;
   color: ${(props) => props.theme.foregroundDark};
 
   &:hover {
     color: ${(props) => props.theme.highlight};
-    background-color: ${(props) => props.theme.backgroundLighter};
+    background-color: ${(props) => props.theme.surfaceRaised};
   }
 `
 
@@ -61,7 +61,7 @@ const WarningContainer = styled.div`
   display: flex;
   color: ${(props) => props.theme.warning};
   background-color: ${(props) => props.theme.backgroundDarker};
-  border-top: 1px solid ${(props) => props.theme.chromeLine};
+  border-top: 1px solid ${(props) => props.theme.borderSubtle};
   align-items: center;
   padding: 12px 20px;
 `

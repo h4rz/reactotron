@@ -1,8 +1,10 @@
 import React, { useContext } from "react"
-import { renderHook } from "@testing-library/react"
+import { act, renderHook } from "@testing-library/react"
 
 import AppPreferencesContext, {
   AppPreferencesProvider,
+  darkThemeStyleStorageKey,
+  lightThemeStyleStorageKey,
   themeAppearanceStorageKey,
   themeModeStorageKey,
   themeStyleStorageKey,
@@ -34,6 +36,8 @@ describe("AppPreferences", () => {
   afterEach(() => {
     window.localStorage.removeItem(themeModeStorageKey)
     window.localStorage.removeItem(themeStyleStorageKey)
+    window.localStorage.removeItem(lightThemeStyleStorageKey)
+    window.localStorage.removeItem(darkThemeStyleStorageKey)
     window.localStorage.removeItem(themeAppearanceStorageKey)
   })
 
@@ -48,6 +52,30 @@ describe("AppPreferences", () => {
     const { result } = renderHook(() => useContext(AppPreferencesContext), { wrapper })
 
     expect(result.current.themeStyle).toBe(themeStyle)
+    expect(result.current.lightThemeStyle).toBe(themeStyle)
+    expect(result.current.darkThemeStyle).toBe(themeStyle)
     expect(result.current.themeAppearance).toBe("dark")
+  })
+
+  it("stores and resolves light and dark theme styles independently", () => {
+    window.localStorage.setItem(lightThemeStyleStorageKey, "everforest")
+    window.localStorage.setItem(darkThemeStyleStorageKey, "one")
+    window.localStorage.setItem(themeAppearanceStorageKey, "dark")
+
+    const { result } = renderHook(() => useContext(AppPreferencesContext), { wrapper })
+
+    expect(result.current.themeStyle).toBe("one")
+    expect(result.current.themeMode).toBe("oneDarkPro")
+
+    act(() => result.current.setThemeAppearance("light"))
+
+    expect(result.current.themeStyle).toBe("everforest")
+    expect(result.current.themeMode).toBe("everforestLight")
+
+    act(() => result.current.setThemeStyleForAppearance("light", "kanagawa"))
+
+    expect(result.current.lightThemeStyle).toBe("kanagawa")
+    expect(result.current.darkThemeStyle).toBe("one")
+    expect(window.localStorage.getItem(lightThemeStyleStorageKey)).toBe("kanagawa")
   })
 })

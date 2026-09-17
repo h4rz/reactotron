@@ -10,6 +10,8 @@ export type ThemeAppearance = "system" | "dark" | "light"
 
 const themeModeStorageKey = "reactotron.themeMode"
 const themeStyleStorageKey = "reactotron.themeStyle"
+const lightThemeStyleStorageKey = "reactotron.lightThemeStyle"
+const darkThemeStyleStorageKey = "reactotron.darkThemeStyle"
 const themeAppearanceStorageKey = "reactotron.themeAppearance"
 const newTimelineStorageKey = "reactotron.enableNewTimeline"
 const startWithCompactSidebarStorageKey = "reactotron.startWithCompactSidebar"
@@ -25,7 +27,10 @@ export const defaultMaxCommands = 2000
 export const minMaxCommands = 100
 export const maxMaxCommands = 50000
 
-const legacyThemeMigrations: Record<string, { themeStyle: ThemeStyle; themeAppearance: ThemeAppearance }> = {
+const legacyThemeMigrations: Record<
+  string,
+  { themeStyle: ThemeStyle; themeAppearance: ThemeAppearance }
+> = {
   tokyoNight: { themeStyle: "kanagawa", themeAppearance: "dark" },
   githubDark: { themeStyle: "one", themeAppearance: "dark" },
   rosePine: { themeStyle: "kanagawa", themeAppearance: "dark" },
@@ -36,6 +41,12 @@ interface Context {
   themeMode: ThemeName
   themeStyle: ThemeStyle
   setThemeStyle: (themeStyle: ThemeStyle) => void
+  lightThemeStyle: ThemeStyle
+  darkThemeStyle: ThemeStyle
+  setThemeStyleForAppearance: (
+    appearance: Exclude<ThemeAppearance, "system">,
+    themeStyle: ThemeStyle
+  ) => void
   themeAppearance: ThemeAppearance
   setThemeAppearance: (themeAppearance: ThemeAppearance) => void
   enableNewTimeline: boolean
@@ -83,6 +94,15 @@ function readThemeStyle(): ThemeStyle {
   if (themeStyles.includes(savedThemeStyle as ThemeStyle)) return savedThemeStyle as ThemeStyle
 
   return readLegacyThemePreference()?.themeStyle ?? "solarized"
+}
+
+function readThemeStyleForAppearance(storageKey: string): ThemeStyle {
+  if (typeof window === "undefined") return "solarized"
+
+  const savedThemeStyle = window.localStorage.getItem(storageKey)
+  if (themeStyles.includes(savedThemeStyle as ThemeStyle)) return savedThemeStyle as ThemeStyle
+
+  return readThemeStyle()
 }
 
 function readThemeAppearance(): ThemeAppearance {
@@ -145,6 +165,9 @@ const AppPreferencesContext = React.createContext<Context>({
   themeMode: "solarizedDark",
   themeStyle: "solarized",
   setThemeStyle: noop,
+  lightThemeStyle: "solarized",
+  darkThemeStyle: "solarized",
+  setThemeStyleForAppearance: noop,
   themeAppearance: "system",
   setThemeAppearance: noop,
   enableNewTimeline: true,
@@ -156,7 +179,12 @@ const AppPreferencesContext = React.createContext<Context>({
 })
 
 const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [themeStyle, setThemeStyleState] = useState<ThemeStyle>(readThemeStyle)
+  const [lightThemeStyle, setLightThemeStyle] = useState<ThemeStyle>(() =>
+    readThemeStyleForAppearance(lightThemeStyleStorageKey)
+  )
+  const [darkThemeStyle, setDarkThemeStyle] = useState<ThemeStyle>(() =>
+    readThemeStyleForAppearance(darkThemeStyleStorageKey)
+  )
   const [themeAppearance, setThemeAppearanceState] = useState<ThemeAppearance>(readThemeAppearance)
   const [systemAppearance, setSystemAppearance] = useState<"dark" | "light">(getSystemAppearance)
   const [enableNewTimeline, setEnableNewTimelineState] = useState(readEnableNewTimeline)
@@ -174,6 +202,7 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [])
 
   const resolvedAppearance = themeAppearance === "system" ? systemAppearance : themeAppearance
+  const themeStyle = resolvedAppearance === "dark" ? darkThemeStyle : lightThemeStyle
   const themeMode = themeVariants[themeStyle][resolvedAppearance]
 
   React.useEffect(() => {
@@ -184,11 +213,30 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [themeMode])
 
   const setThemeStyle = useCallback((nextThemeStyle: ThemeStyle) => {
-    setThemeStyleState(nextThemeStyle)
+    setLightThemeStyle(nextThemeStyle)
+    setDarkThemeStyle(nextThemeStyle)
     if (typeof window !== "undefined") {
       window.localStorage.setItem(themeStyleStorageKey, nextThemeStyle)
+      window.localStorage.setItem(lightThemeStyleStorageKey, nextThemeStyle)
+      window.localStorage.setItem(darkThemeStyleStorageKey, nextThemeStyle)
     }
   }, [])
+
+  const setThemeStyleForAppearance = useCallback(
+    (appearance: Exclude<ThemeAppearance, "system">, nextThemeStyle: ThemeStyle) => {
+      if (appearance === "light") {
+        setLightThemeStyle(nextThemeStyle)
+      } else {
+        setDarkThemeStyle(nextThemeStyle)
+      }
+
+      if (typeof window === "undefined") return
+      const storageKey =
+        appearance === "light" ? lightThemeStyleStorageKey : darkThemeStyleStorageKey
+      window.localStorage.setItem(storageKey, nextThemeStyle)
+    },
+    []
+  )
 
   const setThemeAppearance = useCallback((nextThemeAppearance: ThemeAppearance) => {
     setThemeAppearanceState(nextThemeAppearance)
@@ -224,6 +272,9 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       themeMode,
       themeStyle,
       setThemeStyle,
+      lightThemeStyle,
+      darkThemeStyle,
+      setThemeStyleForAppearance,
       themeAppearance,
       setThemeAppearance,
       enableNewTimeline,
@@ -235,12 +286,15 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }),
     [
       enableNewTimeline,
+      darkThemeStyle,
+      lightThemeStyle,
       maxCommands,
       setMaxCommands,
       setEnableNewTimeline,
       setStartWithCompactSidebar,
       setThemeAppearance,
       setThemeStyle,
+      setThemeStyleForAppearance,
       startWithCompactSidebar,
       themeAppearance,
       themeMode,
@@ -253,6 +307,8 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 export {
   maxCommandsStorageKey,
+  darkThemeStyleStorageKey,
+  lightThemeStyleStorageKey,
   startWithCompactSidebarStorageKey,
   themeAppearanceStorageKey,
   themeModeChangeEvent,

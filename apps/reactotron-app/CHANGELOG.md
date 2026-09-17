@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.2](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.1...reactotron-app@3.14.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* **app:** prevent simulator stream memory growth ([623c5ba](https://github.com/hurajgor/reactotron/commit/623c5ba2a99b7b223b64caecf89e10c88539e719))
+
 ### [3.14.1](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.0...reactotron-app@3.14.1) (2026-09-16)
 
 

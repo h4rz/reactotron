@@ -25,7 +25,8 @@ import {
   resolveVisualScreenAspectRatio,
   type DeviceFrameLayout,
 } from "./layout"
-import { createLatestFrameProcessor } from "./latestFrameProcessor"
+import { AvccStreamParser, avcCodecString } from "./avccStream"
+import { createMjpegFrameParser } from "./mjpegFrameParser"
 
 import { getConfiguredServerPort } from "../../config"
 
@@ -66,15 +67,8 @@ const CONTROL_SOCKET_RETRY_DELAY = 2000
 const CONTROL_SOCKET_RETRY_LIMIT = 5
 const PREVIEW_RETRY_DELAY = 1000
 const PREVIEW_RETRY_LIMIT = 4
-const MAX_PREVIEW_FRAME_BYTES = 16 * 1024 * 1024
-
-/** Index of a two-byte JPEG marker (0xff followed by `marker`), or -1. */
-function indexOfMarker(data: Uint8Array, marker: number, from: number) {
-  for (let index = from; index < data.length - 1; index += 1) {
-    if (data[index] === 0xff && data[index + 1] === marker) return index
-  }
-  return -1
-}
+const IOS_DECODE_QUEUE_LIMIT = 8
+const IOS_FRAME_DURATION_MICROSECONDS = 16_667
 
 const Panel = styled.aside<{ $isOpen: boolean; $isResizing: boolean; $width: number }>`
   display: flex;
@@ -200,6 +194,21 @@ const Actions = styled.div`
 `
 
 const Preview = styled.canvas<{
+  $rotation: -90 | 0 | 90
+  $screenWidth: number
+  $screenHeight: number
+}>`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: ${(props) => (props.$rotation === 0 ? "100%" : `${props.$screenHeight}px`)};
+  height: ${(props) => (props.$rotation === 0 ? "100%" : `${props.$screenWidth}px`)};
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(${(props) => props.$rotation}deg);
+  user-select: none;
+`
+
+const FallbackPreview = styled.img<{
   $rotation: -90 | 0 | 90
   $screenWidth: number
   $screenHeight: number
@@ -522,7 +531,7 @@ type AndroidVideoFrame = {
 }
 
 /**
- * Draw an MJPEG stream into a canvas.
+ * Draw an MJPEG stream into an image.
  *
  * The obvious approach — pointing an <img> at the stream URL — fails in the
  * renderer: when the multipart response ends abnormally, which serve-sim does
@@ -531,12 +540,12 @@ type AndroidVideoFrame = {
  * complete: true with naturalWidth 0, so the preview goes black even though the
  * server is still streaming and the element is laid out correctly.
  *
- * Reading the stream here keeps every decoded frame under our control: a broken
- * connection leaves the last frame on the canvas and the next one simply paints
- * over it.
+ * Reading the stream here keeps every decoded frame under our control. Blob URLs
+ * preserve the last good frame across a broken response without allocating an
+ * ImageBitmap for every frame.
  */
-function useIOSVideoStream(streamUrl: string | undefined, enabled: boolean) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+function useIOSMjpegStream(streamUrl: string | undefined, enabled: boolean) {
+  const imageRef = useRef<HTMLImageElement>(null)
   const [isStreaming, setIsStreaming] = useState(false)
 
   useEffect(() => {
@@ -550,63 +559,55 @@ function useIOSVideoStream(streamUrl: string | undefined, enabled: boolean) {
     let attempts = 0
     let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null
     let hasPaintedFrame = false
+    let pendingFrameUrl: string | null = null
+    let paintedFrameUrl: string | null = null
+    let paintFrameId: number | undefined
     const controller = new AbortController()
+    const image = imageRef.current
 
-    const frameProcessor = createLatestFrameProcessor(async (frame: Uint8Array) => {
-      let bitmap: ImageBitmap | undefined
-      try {
-        bitmap = await createImageBitmap(new Blob([frame], { type: "image/jpeg" }))
-        const canvas = canvasRef.current
-        if (disposed || !canvas) return
-        if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-          canvas.width = bitmap.width
-          canvas.height = bitmap.height
-        }
-        canvas.getContext("2d")?.drawImage(bitmap, 0, 0)
-        if (!hasPaintedFrame) {
-          hasPaintedFrame = true
-          setIsStreaming(true)
-        }
-        attempts = 0
-      } finally {
-        bitmap?.close()
+    const paintPendingFrame = () => {
+      paintFrameId = undefined
+      const nextFrameUrl = pendingFrameUrl
+      pendingFrameUrl = null
+      if (!nextFrameUrl) return
+      if (!image || disposed) {
+        URL.revokeObjectURL(nextFrameUrl)
+        return
       }
+      if (paintedFrameUrl) URL.revokeObjectURL(paintedFrameUrl)
+      paintedFrameUrl = nextFrameUrl
+      image.src = nextFrameUrl
+    }
+
+    const parser = createMjpegFrameParser((frame) => {
+      const nextFrameUrl = URL.createObjectURL(new Blob([frame], { type: "image/jpeg" }))
+      if (pendingFrameUrl) URL.revokeObjectURL(pendingFrameUrl)
+      pendingFrameUrl = nextFrameUrl
+      if (paintFrameId === undefined) paintFrameId = window.requestAnimationFrame(paintPendingFrame)
     })
+
+    const onFrameLoaded = () => {
+      if (disposed) return
+      if (!hasPaintedFrame) {
+        hasPaintedFrame = true
+        setIsStreaming(true)
+      }
+      attempts = 0
+    }
+    image?.addEventListener("load", onFrameLoaded)
 
     const read = async () => {
       try {
         const response = await fetch(streamUrl, { signal: controller.signal })
         if (!response.body) throw new Error("The simulator preview returned no stream.")
         const reader = response.body.getReader()
-        let buffer = new Uint8Array(0)
 
         activeReader = reader
 
         for (;;) {
           const { done, value } = await reader.read()
           if (done || disposed) break
-          const next = new Uint8Array(buffer.length + value.length)
-          next.set(buffer, 0)
-          next.set(value, buffer.length)
-          buffer = next
-
-          // Frames are delimited by the JPEG start- and end-of-image markers
-          // rather than the multipart boundary, which keeps this independent of
-          // how the parts are chunked across reads.
-          for (;;) {
-            const start = indexOfMarker(buffer, 0xd8, 0)
-            if (start === -1) break
-            const end = indexOfMarker(buffer, 0xd9, start + 2)
-            if (end === -1) {
-              if (start > 0) buffer = buffer.slice(start)
-              break
-            }
-            frameProcessor.push(buffer.slice(start, end + 2))
-            buffer = buffer.slice(end + 2)
-          }
-
-          // Never let an unterminated frame grow without bound.
-          if (buffer.length > MAX_PREVIEW_FRAME_BYTES) buffer = new Uint8Array(0)
+          parser.push(value)
         }
       } catch {
         // Fall through to the retry below.
@@ -625,8 +626,11 @@ function useIOSVideoStream(streamUrl: string | undefined, enabled: boolean) {
 
     return () => {
       disposed = true
-      frameProcessor.stop()
       window.clearTimeout(retryTimer)
+      if (paintFrameId !== undefined) window.cancelAnimationFrame(paintFrameId)
+      if (pendingFrameUrl) URL.revokeObjectURL(pendingFrameUrl)
+      if (paintedFrameUrl) URL.revokeObjectURL(paintedFrameUrl)
+      image?.removeEventListener("load", onFrameLoaded)
       // Cancelling the reader closes the socket immediately. Aborting alone can
       // leave the previous connection draining, which shows up as a second
       // stream still attached to serve-sim.
@@ -637,7 +641,197 @@ function useIOSVideoStream(streamUrl: string | undefined, enabled: boolean) {
     }
   }, [enabled, streamUrl])
 
+  return { imageRef, isStreaming }
+}
+
+function useIOSAvccStream(
+  streamUrl: string | undefined,
+  enabled: boolean,
+  onUnsupported: () => void
+) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const onUnsupportedRef = useRef(onUnsupported)
+  onUnsupportedRef.current = onUnsupported
+  const [isStreaming, setIsStreaming] = useState(false)
+
+  useEffect(() => {
+    if (!streamUrl || !enabled) {
+      setIsStreaming(false)
+      return undefined
+    }
+
+    const VideoDecoderConstructor = (globalThis as any).VideoDecoder
+    const EncodedVideoChunkConstructor = (globalThis as any).EncodedVideoChunk
+    if (!VideoDecoderConstructor || !EncodedVideoChunkConstructor) {
+      onUnsupportedRef.current()
+      return undefined
+    }
+
+    let disposed = false
+    let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null
+    let decoder: any = null
+    let retryTimer: number | undefined
+    let timestamp = 0
+    let attempts = 0
+    let awaitingKeyframe = true
+    const controller = new AbortController()
+    const avccUrl = streamUrl.replace(/stream\.mjpeg(?:\?.*)?$/, "stream.avcc")
+
+    const closeDecoder = () => {
+      try {
+        decoder?.close()
+      } catch {
+        // The decoder may already have closed itself after an error.
+      }
+      decoder = null
+      awaitingKeyframe = true
+    }
+
+    const paint = (source: CanvasImageSource, width: number, height: number) => {
+      const canvas = canvasRef.current
+      if (disposed || !canvas) return
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width
+        canvas.height = height
+      }
+      canvas.getContext("2d")?.drawImage(source, 0, 0, width, height)
+      attempts = 0
+      setIsStreaming(true)
+    }
+
+    const makeDecoder = () =>
+      new VideoDecoderConstructor({
+        output: (frame: any) => {
+          try {
+            paint(frame, frame.displayWidth, frame.displayHeight)
+          } finally {
+            frame.close()
+          }
+        },
+        error: () => {
+          closeDecoder()
+          activeReader?.cancel().catch(() => undefined)
+        },
+      })
+
+    const configureDecoder = async (description: Uint8Array) => {
+      const config = {
+        codec: avcCodecString(description),
+        description,
+        optimizeForLatency: true,
+      }
+      const support = await VideoDecoderConstructor.isConfigSupported(config).catch(() => ({
+        supported: false,
+      }))
+      if (!support.supported || disposed) return false
+      closeDecoder()
+      decoder = makeDecoder()
+      decoder.configure(config)
+      awaitingKeyframe = true
+      return true
+    }
+
+    const read = async () => {
+      const parser = new AvccStreamParser()
+      try {
+        const response = await fetch(avccUrl, { signal: controller.signal })
+        if (!response.ok || !response.body) {
+          throw new Error(`The simulator AVCC stream returned ${response.status}.`)
+        }
+        const reader = response.body.getReader()
+        activeReader = reader
+
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done || disposed) break
+          for (const chunk of parser.push(value)) {
+            if (chunk.type === "seed") {
+              let bitmap: ImageBitmap | undefined
+              try {
+                bitmap = await createImageBitmap(new Blob([chunk.payload], { type: "image/jpeg" }))
+                paint(bitmap, bitmap.width, bitmap.height)
+              } finally {
+                bitmap?.close()
+              }
+              continue
+            }
+            if (chunk.type === "description") {
+              if (!(await configureDecoder(chunk.payload))) {
+                onUnsupportedRef.current()
+                await reader.cancel().catch(() => undefined)
+                return
+              }
+              continue
+            }
+            if (!decoder || decoder.state !== "configured") continue
+            const isKeyframe = chunk.type === "keyframe"
+            if (awaitingKeyframe) {
+              if (!isKeyframe) continue
+              awaitingKeyframe = false
+            }
+            if (decoder.decodeQueueSize > IOS_DECODE_QUEUE_LIMIT) {
+              await reader.cancel().catch(() => undefined)
+              break
+            }
+            decoder.decode(
+              new EncodedVideoChunkConstructor({
+                type: isKeyframe ? "key" : "delta",
+                timestamp,
+                data: chunk.payload,
+              })
+            )
+            timestamp += IOS_FRAME_DURATION_MICROSECONDS
+          }
+        }
+      } catch {
+        // Retry below unless this effect was disposed.
+      }
+
+      closeDecoder()
+      activeReader = null
+      if (disposed || controller.signal.aborted) return
+      setIsStreaming(false)
+      if (attempts >= PREVIEW_RETRY_LIMIT) return
+      const delay = PREVIEW_RETRY_DELAY * Math.pow(2, attempts)
+      attempts += 1
+      retryTimer = window.setTimeout(read, delay)
+    }
+
+    read().catch(() => undefined)
+
+    return () => {
+      disposed = true
+      window.clearTimeout(retryTimer)
+      activeReader?.cancel().catch(() => undefined)
+      activeReader = null
+      controller.abort()
+      closeDecoder()
+      setIsStreaming(false)
+    }
+  }, [enabled, streamUrl])
+
   return { canvasRef, isStreaming }
+}
+
+function useIOSVideoStream(streamUrl: string | undefined, enabled: boolean) {
+  const supportsAvcc =
+    typeof (globalThis as any).VideoDecoder === "function" &&
+    typeof (globalThis as any).EncodedVideoChunk === "function"
+  const [useMjpegFallback, setUseMjpegFallback] = useState(!supportsAvcc)
+
+  useEffect(() => setUseMjpegFallback(!supportsAvcc), [streamUrl, supportsAvcc])
+
+  const avcc = useIOSAvccStream(streamUrl, enabled && !useMjpegFallback, () =>
+    setUseMjpegFallback(true)
+  )
+  const mjpeg = useIOSMjpegStream(streamUrl, enabled && useMjpegFallback)
+
+  return {
+    canvasRef: avcc.canvasRef,
+    imageRef: mjpeg.imageRef,
+    isStreaming: useMjpegFallback ? mjpeg.isStreaming : avcc.isStreaming,
+    useMjpegFallback,
+  }
 }
 
 function useAndroidVideoStream(
@@ -829,10 +1023,11 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     0,
     (deviceFrameLayout?.height ?? 0) - (deviceFrameLayout?.bezel ?? 0) * 2
   )
-  const { canvasRef: iosVideoCanvasRef } = useIOSVideoStream(
-    activePreviewStreamUrl,
-    isOpen && Boolean(activeSurface) && !isChoosing
-  )
+  const {
+    canvasRef: iosVideoCanvasRef,
+    imageRef: iosVideoImageRef,
+    useMjpegFallback: iosUsesMjpeg,
+  } = useIOSVideoStream(activePreviewStreamUrl, isOpen && Boolean(activeSurface) && !isChoosing)
   const { canvasRef: androidVideoCanvasRef, error: androidVideoError } = useAndroidVideoStream(
     activeAndroidDevice?.id,
     isOpen && isAndroidSurfaceActive && !isChoosing,
@@ -1794,14 +1989,24 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     role="application"
                     tabIndex={0}
                   >
-                    <Preview
-                      ref={iosVideoCanvasRef}
-                      $rotation={activeStreamRotation}
-                      $screenWidth={activeScreenWidth}
-                      $screenHeight={activeScreenHeight}
-                      aria-label={`${activeSurface.name} simulator screen`}
-                      role="img"
-                    />
+                    {iosUsesMjpeg ? (
+                      <FallbackPreview
+                        ref={iosVideoImageRef}
+                        $rotation={activeStreamRotation}
+                        $screenWidth={activeScreenWidth}
+                        $screenHeight={activeScreenHeight}
+                        aria-label={`${activeSurface.name} simulator screen`}
+                      />
+                    ) : (
+                      <Preview
+                        ref={iosVideoCanvasRef}
+                        $rotation={activeStreamRotation}
+                        $screenWidth={activeScreenWidth}
+                        $screenHeight={activeScreenHeight}
+                        aria-label={`${activeSurface.name} simulator screen`}
+                        role="img"
+                      />
+                    )}
                   </DeviceFrame>
                 </PreviewPane>
               </PreviewContainer>

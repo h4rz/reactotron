@@ -107,6 +107,12 @@ function createMainWindow() {
     })
   })
 
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (window.isDestroyed() || details.reason === "clean-exit") return
+    log.error(`Renderer exited (${details.reason}); reloading the window.`)
+    window.webContents.reload()
+  })
+
   window.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown" || !input.meta) return
 

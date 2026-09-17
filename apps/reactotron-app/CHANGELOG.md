@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.4](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.3...reactotron-app@3.14.4) (2026-09-17)
+
+
+### Features
+
+* **app:** improve desktop controls and theming ([2ce83cb](https://github.com/hurajgor/reactotron/commit/2ce83cba851e07ca9c9bab59016081a55c9be5fc))
+
 ### [3.14.3](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.2...reactotron-app@3.14.3) (2026-09-17)
 
 

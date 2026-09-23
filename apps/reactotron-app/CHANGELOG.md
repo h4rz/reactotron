@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.5](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.4...reactotron-app@3.14.5) (2026-09-23)
+
+
+### Bug Fixes
+
+* **app:** repair Xcode 27 simulator input ([aef479c](https://github.com/hurajgor/reactotron/commit/aef479cf85a8d2d0264d0224fa5dd988f45db6dc))
+
 ### [3.14.4](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.3...reactotron-app@3.14.4) (2026-09-17)
 
 

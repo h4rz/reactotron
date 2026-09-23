@@ -336,6 +336,32 @@ function getServeSimRunner(args: string[]): {
   }
 }
 
+const DEVICE_HUB_INPUT_STATE = "com.apple.coredevice.dtuhidd.active"
+
+async function repairIOSSimulatorInput(udid: string): Promise<string> {
+  const simulatorCommand = ["simctl", "spawn", udid]
+  const state = await runCommand("xcrun", [
+    ...simulatorCommand,
+    "notifyutil",
+    "-g",
+    DEVICE_HUB_INPUT_STATE,
+  ])
+
+  if (state.trim() !== `${DEVICE_HUB_INPUT_STATE} 1`) {
+    return "Input is not shadowed by Device Hub; no restart was needed."
+  }
+
+  await runCommand("xcrun", [...simulatorCommand, "notifyutil", "-s", DEVICE_HUB_INPUT_STATE, "0"])
+  await runCommand("xcrun", [
+    ...simulatorCommand,
+    "launchctl",
+    "kickstart",
+    "-k",
+    "system/com.apple.backboardd",
+  ])
+  return "Input repaired. Reopen your app, then try typing."
+}
+
 function getAvailablePort(startingPort = 3200): Promise<number> {
   return new Promise((resolve, reject) => {
     const tryPort = (port: number) => {
@@ -1043,6 +1069,31 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
       // the guard first would let a start that arrives in between spawn its own
       // server alongside this one.
       return { ok: true, ...(await restartServeSim(udid)) }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle("repair-ios-simulator-input", async (event, udid: unknown) => {
+    try {
+      assertIOSSimulatorUdid(udid)
+      const window = ElectronBrowserWindow.fromWebContents(event.sender)
+      const confirmation = await dialog.showMessageBox(window ?? undefined, {
+        type: "warning",
+        title: "Repair Simulator Input?",
+        message: "Repair keyboard and touch input?",
+        detail:
+          "Xcode Device Hub will restart SpringBoard and close every app currently running in this simulator.",
+        buttons: ["Repair Input", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      })
+      if (confirmation.response !== 0) return { ok: false, cancelled: true }
+
+      await stopServeSim(udid)
+      const message = await repairIOSSimulatorInput(udid)
+      return { ok: true, message, ...(await startServeSim(udid)) }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }

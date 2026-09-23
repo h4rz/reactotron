@@ -4,6 +4,7 @@ import {
   MdAdd,
   MdApps,
   MdArrowBack,
+  MdBuild,
   MdClose,
   MdFiberManualRecord,
   MdHome,
@@ -1510,6 +1511,45 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setStatus("")
   }, [activeSurface])
 
+  const repairInput = useCallback(async () => {
+    if (!activeSurface) return
+
+    setStatus("Repairing simulator input…")
+    setIsError(false)
+    const result = (await ipcRenderer.invoke(
+      "repair-ios-simulator-input",
+      activeSurface.udid
+    )) as IPCResponse & {
+      cancelled?: boolean
+      previewUrl?: string
+      streamUrl?: string
+      wsUrl?: string
+    }
+    if (result.cancelled) {
+      setStatus("")
+      return
+    }
+    if (!result.ok || !result.previewUrl || !result.streamUrl || !result.wsUrl) {
+      setStatus(result.message || "Could not repair simulator input.")
+      setIsError(true)
+      return
+    }
+
+    setSurfaces((current) =>
+      current.map((surface) =>
+        surface.udid === activeSurface.udid
+          ? {
+              ...surface,
+              previewUrl: result.previewUrl!,
+              streamUrl: result.streamUrl!,
+              wsUrl: result.wsUrl!,
+            }
+          : surface
+      )
+    )
+    setStatus(result.message || "Simulator input repaired. Reopen your app, then try typing.")
+  }, [activeSurface])
+
   const shutdown = async () => {
     if (!activeSurface) return
 
@@ -2027,6 +2067,13 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     onClick={() => reconnect().catch(() => undefined)}
                   >
                     <MdOutlineLink size={18} />
+                  </IconButton>
+                  <IconButton
+                    type="button"
+                    title="Repair keyboard and touch input (restarts simulator apps)"
+                    onClick={() => repairInput().catch(() => undefined)}
+                  >
+                    <MdBuild size={18} />
                   </IconButton>
                   <IconButton
                     type="button"

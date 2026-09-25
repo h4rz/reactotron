@@ -77,7 +77,7 @@ test("does not stack console patches across reconnects", () => {
   expect(client.send).toHaveBeenCalledTimes(1)
 })
 
-test("restores the original console methods on disconnect", () => {
+test("restores the original console methods after a permanent close", () => {
   const originalInfo = jest.fn()
   const originalLog = jest.fn()
   const originalWarn = jest.fn()
@@ -87,7 +87,11 @@ test("restores the original console methods on disconnect", () => {
   console.warn = originalWarn
   console.debug = originalDebug
 
-  const plugin = trackGlobalLogs()(buildClient())
+  const plugin = trackGlobalLogs()({
+    ...buildClient(),
+    connected: false,
+    options: { reconnect: true },
+  })
 
   plugin.onConnect()
   plugin.onDisconnect?.()
@@ -96,6 +100,37 @@ test("restores the original console methods on disconnect", () => {
   expect(console.log).toBe(originalLog)
   expect(console.warn).toBe(originalWarn)
   expect(console.debug).toBe(originalDebug)
+})
+
+test("tracks console calls during a transient disconnect without stacking wrappers", () => {
+  const originalInfo = jest.fn()
+  console.info = originalInfo
+
+  const client = {
+    ...buildClient(),
+    connected: true,
+    options: { reconnect: true },
+  }
+  const plugin = trackGlobalLogs()(client)
+
+  plugin.onConnect()
+  plugin.onDisconnect?.()
+  console.info("auction update", { currentBid: 125 })
+  plugin.onConnect()
+  console.info("auction update", { currentBid: 150 })
+
+  expect(originalInfo).toHaveBeenCalledTimes(2)
+  expect(client.send).toHaveBeenCalledTimes(2)
+  expect(client.send).toHaveBeenNthCalledWith(
+    1,
+    "log",
+    { level: "info", message: ["auction update", { currentBid: 125 }] },
+    false
+  )
+
+  client.connected = false
+  plugin.onDisconnect?.()
+  expect(console.info).toBe(originalInfo)
 })
 
 /**

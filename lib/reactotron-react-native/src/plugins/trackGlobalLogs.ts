@@ -37,8 +37,9 @@ const trackGlobalLogs = () => (reactotron: ReactotronCore) => {
 
   return {
     onConnect: () => {
-      // a reconnect without an intervening disconnect must not stack patches
-      restore()
+      // Keep the same wrapper across reconnects so console calls made while
+      // the socket is down are queued by the core client instead of lost.
+      if (originals) return
 
       originals = {
         log: console.log,
@@ -73,7 +74,12 @@ const trackGlobalLogs = () => (reactotron: ReactotronCore) => {
       // console.error is taken care of by ./trackGlobalErrors.ts
     },
     onDisconnect: () => {
-      restore()
+      // close() sets connected=false. Unexpected closes keep it true while
+      // reconnecting, so leave the wrapper installed for the send queue.
+      const reconnecting =
+        (client as typeof client & { connected?: boolean }).connected === true &&
+        client.options.reconnect !== false
+      if (!reconnecting) restore()
     },
   } satisfies Plugin<ReactotronCore>
 }

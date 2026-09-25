@@ -13,6 +13,7 @@ import {
 import styled from "styled-components"
 import { ContentView, EmptyState, Header, ReactotronContext } from "@hurajgor/reactotron-core-ui"
 import type { ApiResponsePayload, Command, LogPayload } from "@hurajgor/reactotron-core-contract"
+import { isCollapsibleLog } from "./logGrouping"
 import { filterJsonValue } from "./jsonFilter"
 
 type ConsoleKind = "network" | "log"
@@ -1171,7 +1172,7 @@ function Network({ title = "Network" }: { title?: string }) {
       })
       .reduce<ConsoleItem[]>((acc, item) => {
         const previous = acc[acc.length - 1]
-        if (previous && isCollapsible(previous, item)) {
+        if (previous && isCollapsibleLog(previous, item)) {
           acc[acc.length - 1] = { ...item, count: previous.count + 1 }
         } else {
           acc.push(item)
@@ -2222,17 +2223,6 @@ function splitLogSource(title: string) {
   const match = /^([A-Za-z_$][\w$]*(?:\s*\[[^\]]*\])?)\s+[-–—:]\s+(.+)$/s.exec(title)
   if (!match) return { source: "", title }
   return { source: match[1].replace(/\s+/g, " "), title: match[2] }
-}
-
-function isCollapsible(previous: ConsoleItem, next: ConsoleItem) {
-  return (
-    previous.kind === "log" &&
-    next.kind === "log" &&
-    previous.status === next.status &&
-    previous.source === next.source &&
-    previous.title === next.title &&
-    previous.subtitle === next.subtitle
-  )
 }
 
 function relativeTime(item: ConsoleItem, previous?: ConsoleItem) {

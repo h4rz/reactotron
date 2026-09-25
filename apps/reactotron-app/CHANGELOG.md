@@ -2,6 +2,14 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [3.14.6](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.5...reactotron-app@3.14.6) (2026-09-25)
+
+
+### Bug Fixes
+
+* **app:** avoid collapsing distinct log payloads ([f0b7824](https://github.com/hurajgor/reactotron/commit/f0b7824f157b0cdb8a833f5467a49bbfbe5a7fae))
+* **app:** preserve complete objects in JSON search ([78fee83](https://github.com/hurajgor/reactotron/commit/78fee8375f023df225a046a295b8dfbea5aa061a))
+
 ### [3.14.5](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.4...reactotron-app@3.14.5) (2026-09-23)
 
 

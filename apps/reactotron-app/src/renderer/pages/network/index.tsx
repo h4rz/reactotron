@@ -13,6 +13,7 @@ import {
 import styled from "styled-components"
 import { ContentView, EmptyState, Header, ReactotronContext } from "@hurajgor/reactotron-core-ui"
 import type { ApiResponsePayload, Command, LogPayload } from "@hurajgor/reactotron-core-contract"
+import { filterJsonValue } from "./jsonFilter"
 
 type ConsoleKind = "network" | "log"
 type BodyMode = "pretty" | "tree" | "raw"
@@ -2788,39 +2789,6 @@ function renderSearchHighlightedText(text: string, search: string, keyPrefix: st
   }
 
   return parts
-}
-
-function filterJsonValue(value: unknown, search: string): unknown {
-  const needle = search.trim().toLowerCase()
-  if (!needle) return value
-
-  const matchesPrimitive = (input: unknown) =>
-    String(input ?? "")
-      .toLowerCase()
-      .includes(needle)
-
-  if (Array.isArray(value)) {
-    const filtered = value
-      .map((item) => filterJsonValue(item, search))
-      .filter((item) => item !== undefined)
-
-    return filtered.length > 0 ? filtered : undefined
-  }
-
-  if (value && typeof value === "object") {
-    const output = {}
-
-    Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
-      const filtered = filterJsonValue(item, search)
-      if (key.toLowerCase().includes(needle) || filtered !== undefined) {
-        output[key] = filtered === undefined ? item : filtered
-      }
-    })
-
-    return Object.keys(output).length > 0 ? output : undefined
-  }
-
-  return matchesPrimitive(value) ? value : undefined
 }
 
 export default Network

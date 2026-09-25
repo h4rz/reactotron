@@ -2,6 +2,14 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [5.3.7](https://github.com/hurajgor/reactotron/compare/reactotron-react-native@5.3.6...reactotron-react-native@5.3.7) (2026-09-25)
+
+
+### Bug Fixes
+
+* **react-native:** retain console capture while reconnecting ([f09a796](https://github.com/hurajgor/reactotron/commit/f09a79621d366cc6b6011ebc00890cb13bf8fffd))
+* **release:** point npm packages to current repo owner ([97247ba](https://github.com/hurajgor/reactotron/commit/97247ba26433ffc3ef48d2f1409b728ab3035655))
+
 ### [5.3.6](https://github.com/hurajgor/reactotron/compare/reactotron-react-native@5.3.5...reactotron-react-native@5.3.6) (2026-09-11)
 
 ### Bug Fixes

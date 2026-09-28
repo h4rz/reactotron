@@ -57,6 +57,18 @@ type AndroidDevice = {
   type: "emulator" | "physical"
 }
 
+type PhysicalIOSDevice = {
+  udid: string
+  name: string
+  productVersion: string
+  available: boolean
+}
+
+type PhysicalIOSSurface = PhysicalIOSDevice & {
+  streamUrl: string
+  screenSize: { width: number; height: number }
+}
+
 type Surface = Simulator & {
   previewUrl: string
   streamUrl: string
@@ -239,6 +251,16 @@ const AndroidVideoPreview = styled.canvas`
   height: 100%;
   object-fit: contain;
   user-select: none;
+`
+
+const PhysicalIOSPreview = styled.img`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 `
 
 const PreviewContainer = styled.div`
@@ -1008,6 +1030,10 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const [panelWidth, setPanelWidth] = useState(400)
   const [deviceFrameLayout, setDeviceFrameLayout] = useState<DeviceFrameLayout | null>(null)
   const [simulators, setSimulators] = useState<Simulator[]>([])
+  const [physicalIOSDevices, setPhysicalIOSDevices] = useState<PhysicalIOSDevice[]>([])
+  const [selectedPhysicalIOSUdid, setSelectedPhysicalIOSUdid] = useState("")
+  const [physicalIOSSurface, setPhysicalIOSSurface] = useState<PhysicalIOSSurface | null>(null)
+  const [activePhysicalIOSUdid, setActivePhysicalIOSUdid] = useState<string | null>(null)
   const [androidDevices, setAndroidDevices] = useState<AndroidDevice[]>([])
   const [selectedAndroidDeviceId, setSelectedAndroidDeviceId] = useState("")
   const [activeAndroidDevice, setActiveAndroidDevice] = useState<AndroidDevice | null>(null)
@@ -1040,22 +1066,29 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     x: number
     y: number
   } | null>(null)
+  const physicalTouchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
 
   const activeSurface = useMemo(
     () => surfaces.find((surface) => surface.udid === activeUdid) ?? null,
     [activeUdid, surfaces]
   )
-  const isAndroidSurfaceActive = activeAndroidDevice !== null && activeUdid === null
+  const activePhysicalIOS =
+    physicalIOSSurface?.udid === activePhysicalIOSUdid ? physicalIOSSurface : null
+  const isAndroidSurfaceActive =
+    activeAndroidDevice !== null && activeUdid === null && activePhysicalIOS === null
   const activeWsUrl = isOpen ? activeSurface?.wsUrl : undefined
   const activePreviewStreamUrl = activeSurface?.streamUrl
-  const activeScreenAspectRatio = isAndroidSurfaceActive
-    ? androidScreenSize.width / androidScreenSize.height
-    : resolveVisualScreenAspectRatio(
-        activeSurface?.screenSize,
-        activeSurface?.orientation ?? "portrait"
-      )
+  const activeScreenAspectRatio = activePhysicalIOS
+    ? activePhysicalIOS.screenSize.width / activePhysicalIOS.screenSize.height
+    : isAndroidSurfaceActive
+      ? androidScreenSize.width / androidScreenSize.height
+      : resolveVisualScreenAspectRatio(
+          activeSurface?.screenSize,
+          activeSurface?.orientation ?? "portrait"
+        )
   const activeFrameKind = resolveDeviceFrameKind(
-    isAndroidSurfaceActive ? activeAndroidDevice?.model : activeSurface?.name,
+    activePhysicalIOS?.name ??
+      (isAndroidSurfaceActive ? activeAndroidDevice?.model : activeSurface?.name),
     activeScreenAspectRatio
   )
   const activeStreamRotation = resolveStreamRotation(
@@ -1195,6 +1228,23 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     )
   }, [])
 
+  const loadPhysicalIOSDevices = useCallback(async () => {
+    const result = (await ipcRenderer.invoke("list-physical-ios-devices")) as IPCResponse & {
+      devices: PhysicalIOSDevice[]
+    }
+    if (!result.ok) {
+      setStatus(result.message || "Could not list connected iPhones.")
+      setIsError(true)
+      return
+    }
+    setPhysicalIOSDevices(result.devices)
+    setSelectedPhysicalIOSUdid((current) =>
+      result.devices.some((device) => device.udid === current)
+        ? current
+        : result.devices.find((device) => device.available)?.udid || ""
+    )
+  }, [])
+
   const loadAndroidDevices = useCallback(async () => {
     setIsAndroidLoading(true)
     const result = (await ipcRenderer.invoke("list-android-devices")) as IPCResponse & {
@@ -1218,9 +1268,44 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     if (supportsIOSSimulator) {
       loadSimulators().catch(() => undefined)
       loadCreationOptions().catch(() => undefined)
+      loadPhysicalIOSDevices().catch(() => undefined)
     }
     loadAndroidDevices().catch(() => undefined)
-  }, [loadAndroidDevices, loadCreationOptions, loadSimulators])
+  }, [loadAndroidDevices, loadCreationOptions, loadPhysicalIOSDevices, loadSimulators])
+
+  const openPhysicalIOS = async () => {
+    if (!selectedPhysicalIOSUdid) return
+    setIsLoading(true)
+    setStatus(
+      "Starting physical iPhone preview. First-time WebDriverAgent setup may take several minutes..."
+    )
+    setIsError(false)
+    const result = (await ipcRenderer.invoke(
+      "open-physical-ios-device",
+      selectedPhysicalIOSUdid
+    )) as IPCResponse & {
+      streamUrl?: string
+      screenSize?: { width: number; height: number }
+    }
+    setIsLoading(false)
+    if (!result.ok || !result.streamUrl || !result.screenSize) {
+      setStatus(result.message || "Could not open physical iPhone preview.")
+      setIsError(true)
+      return
+    }
+    const device = physicalIOSDevices.find((item) => item.udid === selectedPhysicalIOSUdid)
+    if (!device) return
+    setPhysicalIOSSurface({
+      ...device,
+      streamUrl: result.streamUrl,
+      screenSize: result.screenSize,
+    })
+    setActivePhysicalIOSUdid(device.udid)
+    setActiveUdid(null)
+    setIsChoosing(false)
+    setStatus("")
+    setIsError(false)
+  }
 
   useEffect(() => {
     if (androidVideoError) {
@@ -1234,6 +1319,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     if (!device) return
     setActiveAndroidDevice(device)
     setActiveUdid(null)
+    setActivePhysicalIOSUdid(null)
     setAndroidScreenSize({ width: 1080, height: 1920 })
     setIsChoosing(false)
   }
@@ -1276,6 +1362,32 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       x: Math.min(1, Math.max(0, (event.clientX - bounds.left - bezel) / screenWidth)),
       y: Math.min(1, Math.max(0, (event.clientY - bounds.top - bezel) / screenHeight)),
     }
+  }
+
+  const sendPhysicalIOSInput = async (body: Record<string, string | number>) => {
+    if (!activePhysicalIOS) return
+    const result = (await ipcRenderer.invoke(
+      "physical-ios-input",
+      activePhysicalIOS.udid,
+      body
+    )) as IPCResponse
+    if (!result.ok) {
+      setStatus(result.message || "iPhone input failed.")
+      setIsError(true)
+    }
+  }
+
+  const completePhysicalIOSGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const touch = physicalTouchRef.current
+    if (!touch || touch.pointerId !== event.pointerId) return
+    physicalTouchRef.current = null
+    const end = androidScreenPoint(event)
+    const moved = Math.hypot(end.x - touch.x, end.y - touch.y) > 0.015
+    sendPhysicalIOSInput(
+      moved
+        ? { type: "drag", x: touch.x, y: touch.y, x2: end.x, y2: end.y }
+        : { type: "tap", x: touch.x, y: touch.y }
+    ).catch(() => undefined)
   }
 
   const completeAndroidGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1355,6 +1467,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       const existingSurface = surfaces.find((surface) => surface.udid === simulator.udid)
       if (existingSurface) {
         setActiveUdid(existingSurface.udid)
+        setActivePhysicalIOSUdid(null)
         setIsChoosing(false)
         return
       }
@@ -1393,6 +1506,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       )
       setSurfaces((current) => [...current, surface])
       setActiveUdid(simulator.udid)
+      setActivePhysicalIOSUdid(null)
       setIsChoosing(false)
       setStatus("")
     },
@@ -1446,6 +1560,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setSimulators((current) => [...current, result.simulator!])
     setSurfaces((current) => [...current, surface])
     setActiveUdid(surface.udid)
+    setActivePhysicalIOSUdid(null)
     setIsChoosing(false)
     setStatus("")
   }
@@ -1571,7 +1686,9 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
         simulator.udid === activeSurface.udid ? { ...simulator, state: "Shutdown" } : simulator
       )
     )
-    setActiveUdid(remainingSurfaces[Math.max(0, activeIndex - 1)]?.udid || null)
+    const nextSurface = remainingSurfaces[Math.max(0, activeIndex - 1)]
+    setActiveUdid(nextSurface?.udid || null)
+    setActivePhysicalIOSUdid(nextSurface ? null : physicalIOSSurface?.udid ?? null)
     setIsChoosing(remainingSurfaces.length === 0)
     setStatus("")
   }
@@ -1594,7 +1711,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     if (activeUdid === udid) {
       const nextSurface = remainingSurfaces[Math.max(0, activeIndex - 1)]
       setActiveUdid(nextSurface?.udid || null)
-      setIsChoosing(!nextSurface && !activeAndroidDevice)
+      setActivePhysicalIOSUdid(nextSurface ? null : physicalIOSSurface?.udid ?? null)
+      setIsChoosing(!nextSurface && !activeAndroidDevice && !physicalIOSSurface)
     }
     setStatus("")
     setIsError(false)
@@ -1608,24 +1726,51 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     }
     setActiveAndroidDevice(null)
     setActiveUdid(surfaces[0]?.udid ?? null)
-    setIsChoosing(surfaces.length === 0)
+    setActivePhysicalIOSUdid(surfaces.length === 0 ? physicalIOSSurface?.udid ?? null : null)
+    setIsChoosing(surfaces.length === 0 && !physicalIOSSurface)
     setStatus("")
     setIsError(false)
+  }
+
+  const closePhysicalIOSSurface = async () => {
+    if (!physicalIOSSurface) return
+    const udid = physicalIOSSurface.udid
+    setPhysicalIOSSurface(null)
+    setActivePhysicalIOSUdid(null)
+    setActiveUdid(surfaces[0]?.udid ?? null)
+    setIsChoosing(surfaces.length === 0 && !activeAndroidDevice)
+    const result = (await ipcRenderer.invoke("close-physical-ios-device", udid)) as IPCResponse
+    setStatus(result.ok ? "" : result.message || "Could not stop the iPhone preview.")
+    setIsError(!result.ok)
   }
 
   const activeDeviceValue = isChoosing
     ? ""
     : activeSurface
       ? `ios:${activeSurface.udid}`
-      : activeAndroidDevice
-        ? `android:${activeAndroidDevice.id}`
-        : ""
-  const openDeviceCount = surfaces.length + (activeAndroidDevice ? 1 : 0)
-  const activeDeviceName = activeSurface?.name ?? activeAndroidDevice?.model
+      : activePhysicalIOS
+        ? `physical-ios:${activePhysicalIOS.udid}`
+        : activeAndroidDevice
+          ? `android:${activeAndroidDevice.id}`
+          : ""
+  const openDeviceCount =
+    surfaces.length + (activeAndroidDevice ? 1 : 0) + (physicalIOSSurface ? 1 : 0)
+  const activeDeviceName =
+    activeSurface?.name ?? activePhysicalIOS?.name ?? activeAndroidDevice?.model
 
   const selectActiveDevice = (value: string) => {
     if (value.startsWith("ios:")) {
       setActiveUdid(value.slice("ios:".length))
+      setActivePhysicalIOSUdid(null)
+      setIsChoosing(false)
+      return
+    }
+    if (
+      value.startsWith("physical-ios:") &&
+      physicalIOSSurface?.udid === value.slice("physical-ios:".length)
+    ) {
+      setActiveUdid(null)
+      setActivePhysicalIOSUdid(physicalIOSSurface.udid)
       setIsChoosing(false)
       return
     }
@@ -1634,6 +1779,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       activeAndroidDevice?.id === value.slice("android:".length)
     ) {
       setActiveUdid(null)
+      setActivePhysicalIOSUdid(null)
       setIsChoosing(false)
     }
   }
@@ -1641,6 +1787,10 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const closeActiveDevice = () => {
     if (activeSurface) {
       closeSurface(activeSurface.udid).catch(() => undefined)
+      return
+    }
+    if (activePhysicalIOS) {
+      closePhysicalIOSSurface().catch(() => undefined)
       return
     }
     if (activeAndroidDevice && !isChoosing) closeAndroidSurface()
@@ -2006,6 +2156,13 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   ))}
                 </optgroup>
               )}
+              {physicalIOSSurface && (
+                <optgroup label="Physical iPhone">
+                  <option value={`physical-ios:${physicalIOSSurface.udid}`}>
+                    {physicalIOSSurface.name}
+                  </option>
+                </optgroup>
+              )}
               {activeAndroidDevice && (
                 <optgroup label="Android">
                   <option value={`android:${activeAndroidDevice.id}`}>
@@ -2030,6 +2187,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
               onClick={() => {
                 setIsChoosing(true)
                 loadSimulators().catch(() => undefined)
+                loadPhysicalIOSDevices().catch(() => undefined)
                 loadAndroidDevices().catch(() => undefined)
               }}
             >
@@ -2161,6 +2319,54 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                         role="img"
                       />
                     )}
+                  </DeviceFrame>
+                </PreviewPane>
+              </PreviewContainer>
+              {status && <Status $error={isError}>{status}</Status>}
+            </>
+          ) : activePhysicalIOS && !isChoosing ? (
+            <>
+              <ToolBar>
+                <DeviceName
+                  title={`${activePhysicalIOS.name} · iOS ${activePhysicalIOS.productVersion}`}
+                >
+                  {activePhysicalIOS.name}
+                  <ConnectionStatus $connected>USB · Experimental</ConnectionStatus>
+                </DeviceName>
+                <Actions>
+                  <IconButton
+                    type="button"
+                    title="Home"
+                    onClick={() =>
+                      sendPhysicalIOSInput({ type: "button", name: "home" }).catch(() => undefined)
+                    }
+                  >
+                    <MdHome size={19} />
+                  </IconButton>
+                </Actions>
+              </ToolBar>
+              <PreviewContainer>
+                <PreviewPane ref={setPreviewPane}>
+                  <DeviceFrame
+                    $layout={deviceFrameLayout}
+                    $platform="ios"
+                    aria-label={`${activePhysicalIOS.name} physical iPhone screen`}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return
+                      event.preventDefault()
+                      const point = androidScreenPoint(event)
+                      physicalTouchRef.current = { pointerId: event.pointerId, ...point }
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                    }}
+                    onPointerUp={completePhysicalIOSGesture}
+                    onPointerCancel={(event) => {
+                      if (physicalTouchRef.current?.pointerId === event.pointerId)
+                        physicalTouchRef.current = null
+                    }}
+                    role="application"
+                    tabIndex={0}
+                  >
+                    <PhysicalIOSPreview src={activePhysicalIOS.streamUrl} alt="" />
                   </DeviceFrame>
                 </PreviewPane>
               </PreviewContainer>
@@ -2348,6 +2554,38 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                       </>
                     )}
                     <ActionDivider />
+                    <ActionSection>
+                      <ActionLabel>Physical iPhone · experimental</ActionLabel>
+                      <DeviceSelect
+                        aria-label="Connected physical iPhones"
+                        value={selectedPhysicalIOSUdid}
+                        disabled={isLoading || physicalIOSDevices.length === 0}
+                        onChange={(event) => setSelectedPhysicalIOSUdid(event.target.value)}
+                      >
+                        {physicalIOSDevices.map((device) => (
+                          <option
+                            key={device.udid}
+                            value={device.udid}
+                            disabled={!device.available}
+                          >
+                            {device.name} ({device.productVersion})
+                            {device.available ? "" : " - connect USB"}
+                          </option>
+                        ))}
+                      </DeviceSelect>
+                      <SecondaryButton
+                        type="button"
+                        disabled={isLoading || !selectedPhysicalIOSUdid}
+                        onClick={() => openPhysicalIOS().catch(() => undefined)}
+                      >
+                        {isLoading ? "Starting..." : "Try physical iPhone"}
+                      </SecondaryButton>
+                      <EmptyCopy>
+                        Connect and trust a USB iPhone. A signed WebDriverAgent streams it in this
+                        panel.
+                      </EmptyCopy>
+                    </ActionSection>
+                    <ActionDivider />
                   </>
                 )}
                 <ActionSection>
@@ -2384,6 +2622,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                 disabled={isLoading || isAndroidLoading}
                 onClick={() => {
                   if (supportsIOSSimulator) loadSimulators().catch(() => undefined)
+                  if (supportsIOSSimulator) loadPhysicalIOSDevices().catch(() => undefined)
                   loadAndroidDevices().catch(() => undefined)
                 }}
               >

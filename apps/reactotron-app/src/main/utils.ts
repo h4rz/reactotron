@@ -7,6 +7,14 @@ import { isIOSSimulatorSupported } from "../platform"
 import { getAdbPath } from "./adb-path"
 import { startAndroidScrcpyStream, type AndroidScrcpyStream } from "./android-scrcpy"
 import {
+  closePhysicalIOSDevice,
+  listPhysicalIOSDevices,
+  openPhysicalIOSDevice,
+  sendPhysicalIOSInput,
+  stopPhysicalIOSPreviews,
+  type PhysicalIOSInput,
+} from "./physical-ios"
+import {
   app,
   type BrowserWindow,
   BrowserWindow as ElectronBrowserWindow,
@@ -1021,6 +1029,54 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
 
   simulatorSurfaceWindow = mainWindow ?? null
 
+  ipcMain.handle("list-physical-ios-devices", async () => {
+    try {
+      return { ok: true, devices: await listPhysicalIOSDevices() }
+    } catch (error) {
+      return {
+        ok: false,
+        devices: [],
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
+  })
+
+  ipcMain.handle("open-physical-ios-device", async (_event, udid: unknown) => {
+    try {
+      if (typeof udid !== "string" || !/^[A-Fa-f0-9-]{24,40}$/.test(udid)) {
+        throw new Error("Invalid iPhone identifier.")
+      }
+      return { ok: true, ...(await openPhysicalIOSDevice(udid)) }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle("close-physical-ios-device", async (_event, udid: unknown) => {
+    try {
+      if (typeof udid !== "string" || !/^[A-Fa-f0-9-]{24,40}$/.test(udid)) {
+        throw new Error("Invalid iPhone identifier.")
+      }
+      await closePhysicalIOSDevice(udid)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle("physical-ios-input", async (_event, udid: unknown, input: unknown) => {
+    try {
+      if (typeof udid !== "string" || !/^[A-Fa-f0-9-]{24,40}$/.test(udid)) {
+        throw new Error("Invalid iPhone identifier.")
+      }
+      if (!input || typeof input !== "object") throw new Error("Invalid iPhone input.")
+      await sendPhysicalIOSInput(udid, input as PhysicalIOSInput)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
   ipcMain.handle("list-booted-ios-simulators", async () => {
     try {
       return { ok: true, simulators: await getAvailableIOSSimulators() }
@@ -1331,6 +1387,7 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
 }
 
 export const stopIOSSimulatorSurfaces = () => {
+  stopPhysicalIOSPreviews()
   // "before-quit" does not await, so there is no opportunity to check whether
   // a serve-sim process honoured SIGTERM before the app goes away. Send
   // SIGKILL outright rather than risk leaving one running after quit.

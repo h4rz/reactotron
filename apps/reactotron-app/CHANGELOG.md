@@ -2,6 +2,14 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [3.15.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.6...reactotron-app@3.15.0) (2026-09-29)
+
+
+### Features
+
+* **app:** add physical iPhone preview to device hub ([79ef580](https://github.com/hurajgor/reactotron/commit/79ef5805c9cca6c008f2cc479cd149a61fb0b9cb))
+* **app:** refine device hub previews and controls ([ca9d9cf](https://github.com/hurajgor/reactotron/commit/ca9d9cf559489e99a6437955cc82d7b3dccbb26e))
+
 ### [3.14.6](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.5...reactotron-app@3.14.6) (2026-09-25)
 
 

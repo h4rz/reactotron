@@ -28,6 +28,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 Uses the [physical-device backend in our serve-sim fork](https://github.com/h4rz/serve-sim/tree/main/packages/serve-sim-device), adapted from [serve-sim pull request #83](https://github.com/EvanBacon/serve-sim/pull/83) by longtimeno-c. Licensed under Apache-2.0.
 
+The optional iPhone Duo simulator backend uses [@expo/serve-sim](https://github.com/expo/expo-device-hub/tree/main/packages/serve-sim/packages/serve-sim), also licensed under Apache-2.0. Its package includes its own license and notice files.
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/

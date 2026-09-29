@@ -66,6 +66,24 @@ const SERVE_SIM_PORT_ATTEMPTS = 5
 const SERVE_SIM_EXIT_TIMEOUT = 3000
 const SERVE_SIM_FORCE_KILL_TIMEOUT = 500
 const androidVideoStreams = new Map<string, AndroidScrcpyStream>()
+const androidPreviousMediaVolumes = new Map<string, number>()
+
+async function getAndroidMediaVolume(deviceId: string): Promise<number> {
+  assertAndroidDeviceId(deviceId)
+  const output = await runCommand(getAdbPath(), [
+    "-s",
+    deviceId,
+    "shell",
+    "media",
+    "volume",
+    "--stream",
+    "3",
+    "--get",
+  ])
+  const volume = Number(output.match(/volume is (\d+)/i)?.[1])
+  if (!Number.isInteger(volume)) throw new Error("Could not read Android media volume.")
+  return volume
+}
 
 function runCommand(
   command: string,
@@ -282,8 +300,10 @@ async function runAndroidDeviceCommand(
   ])
 }
 
-function getServeSimCliPath(): string {
-  const cliPath = path.join("node_modules", "serve-sim", "dist", "serve-sim.js")
+function getServeSimCliPath(duo: boolean): string {
+  const cliPath = duo
+    ? path.join("node_modules", "@expo", "serve-sim", "dist", "serve-sim.js")
+    : path.join("node_modules", "serve-sim", "dist", "serve-sim.js")
   const candidates = new Set([
     path.join(process.resourcesPath, "app.asar.unpacked", cliPath),
     path.join(process.resourcesPath, "app", cliPath),
@@ -302,7 +322,11 @@ function getServeSimCliPath(): string {
   const pathToCli = Array.from(candidates).find((candidate) => fs.existsSync(candidate))
 
   if (!pathToCli) {
-    throw new Error("serve-sim is not installed. Reinstall Reactotron and try again.")
+    throw new Error(
+      duo
+        ? "iPhone Duo support is unavailable in this build. Reinstall Reactotron and try again."
+        : "serve-sim is not installed. Reinstall Reactotron and try again."
+    )
   }
 
   return pathToCli
@@ -320,12 +344,15 @@ function getServeSimCliPath(): string {
  * bundled `ws` dependency. REACTOTRON_NODE_PATH still overrides this for
  * anyone who needs a specific runtime.
  */
-function getServeSimRunner(args: string[]): {
+function getServeSimRunner(
+  args: string[],
+  duo = false
+): {
   command: string
   args: string[]
   env: NodeJS.ProcessEnv
 } {
-  const cliPath = getServeSimCliPath()
+  const cliPath = getServeSimCliPath(duo)
   const overridePath = process.env.REACTOTRON_NODE_PATH
 
   if (overridePath) {
@@ -579,7 +606,12 @@ async function spawnServeSim(
 ): Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }> {
   const port = await getServeSimPort()
   const previewUrl = `http://127.0.0.1:${port}?device=${udid}&session=${Date.now()}`
-  const runner = getServeSimRunner(["--port", String(port), "--codec", "auto", udid])
+  const simulator = (await getAvailableIOSSimulators()).find((item) => item.udid === udid)
+  if (!simulator) throw new Error("That iOS simulator is no longer available.")
+  const runner = getServeSimRunner(
+    ["--port", String(port), "--codec", "auto", udid],
+    /iPhone Duo/i.test(simulator.name) && process.arch === "arm64"
+  )
   const serveSimProcess = childProcess.spawn(runner.command, runner.args, {
     shell: false,
     env: runner.env,
@@ -962,6 +994,40 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
     try {
       assertAndroidDeviceId(deviceId)
       return { ok: true, imageBase64: await captureAndroidDeviceScreenshot(deviceId) }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle("toggle-android-device-mute", async (_event, deviceId: unknown) => {
+    try {
+      assertAndroidDeviceId(deviceId)
+      const adb = getAdbPath()
+      const current = await getAndroidMediaVolume(deviceId)
+      const muted = current !== 0
+      const next = muted ? 0 : androidPreviousMediaVolumes.get(deviceId) ?? 1
+      await runCommand(adb, [
+        "-s",
+        deviceId,
+        "shell",
+        "media",
+        "volume",
+        "--stream",
+        "3",
+        "--set",
+        String(next),
+      ])
+      if (muted) androidPreviousMediaVolumes.set(deviceId, current)
+      return { ok: true, muted }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle("get-android-device-mute", async (_event, deviceId: unknown) => {
+    try {
+      assertAndroidDeviceId(deviceId)
+      return { ok: true, muted: (await getAndroidMediaVolume(deviceId)) === 0 }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
@@ -1367,6 +1433,151 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
   })
+
+  ipcMain.handle("ios-simulator-ui-setting", async (_event, udid: unknown, setting: unknown) => {
+    try {
+      assertIOSSimulatorUdid(udid)
+      if (setting === "contrast") {
+        const current = (
+          await runCommand("xcrun", ["simctl", "ui", udid, "increase_contrast"])
+        ).trim()
+        if (current !== "enabled" && current !== "disabled") {
+          throw new Error("Increase Contrast is unavailable for this simulator.")
+        }
+        const next = current === "enabled" ? "disabled" : "enabled"
+        await runCommand("xcrun", ["simctl", "ui", udid, "increase_contrast", next])
+        return { ok: true, message: `Increase Contrast ${next}.` }
+      }
+      if (setting === "text-larger" || setting === "text-smaller") {
+        await runCommand("xcrun", [
+          "simctl",
+          "ui",
+          udid,
+          "content_size",
+          setting === "text-larger" ? "increment" : "decrement",
+        ])
+        return {
+          ok: true,
+          message: `Simulator text size ${setting === "text-larger" ? "increased" : "decreased"}.`,
+        }
+      }
+      throw new Error("Unsupported simulator setting.")
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle(
+    "ios-simulator-tool",
+    async (_event, udid: unknown, action: unknown, value: unknown) => {
+      try {
+        assertIOSSimulatorUdid(udid)
+        const bundlePattern = /^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/
+        if (action === "open-url") {
+          if (typeof value !== "string" || value.length > 2048) {
+            throw new Error("Enter a valid URL.")
+          }
+          const url = new URL(value)
+          if (["file:", "javascript:", "data:"].includes(url.protocol)) {
+            throw new Error("This URL scheme is not supported.")
+          }
+          await runCommand("xcrun", ["simctl", "openurl", udid, value])
+          return { ok: true, message: "URL opened in simulator." }
+        }
+        if (action === "launch" || action === "terminate") {
+          if (typeof value !== "string" || value.length > 200 || !bundlePattern.test(value)) {
+            throw new Error("Enter a valid app bundle ID.")
+          }
+          await runCommand("xcrun", ["simctl", action, udid, value])
+          return { ok: true, message: `App ${action === "launch" ? "launched" : "terminated"}.` }
+        }
+        if (action === "set-location") {
+          if (typeof value !== "string") throw new Error("Enter latitude and longitude.")
+          const coordinates = value.split(",").map((part) => part.trim())
+          const parts = coordinates.map(Number)
+          if (
+            parts.length !== 2 ||
+            coordinates.some((part) => !part) ||
+            parts.some((part) => !Number.isFinite(part)) ||
+            Math.abs(parts[0]) > 90 ||
+            Math.abs(parts[1]) > 180
+          ) {
+            throw new Error("Enter coordinates as latitude, longitude.")
+          }
+          await runCommand("xcrun", ["simctl", "location", udid, "set", parts.join(",")])
+          return { ok: true, message: "Simulator location set." }
+        }
+        if (action === "clear-location") {
+          await runCommand("xcrun", ["simctl", "location", udid, "clear"])
+          return { ok: true, message: "Simulator location cleared." }
+        }
+        if (action === "privacy") {
+          const request = value as { bundleId?: unknown; service?: unknown; permission?: unknown }
+          const services = [
+            "calendar",
+            "contacts",
+            "location",
+            "location-always",
+            "photos",
+            "photos-add",
+            "microphone",
+            "motion",
+            "reminders",
+          ]
+          if (
+            !request ||
+            typeof request.bundleId !== "string" ||
+            request.bundleId.length > 200 ||
+            !bundlePattern.test(request.bundleId) ||
+            !services.includes(String(request.service)) ||
+            !["grant", "revoke", "reset"].includes(String(request.permission))
+          ) {
+            throw new Error("Choose a permission and enter a valid app bundle ID.")
+          }
+          await runCommand("xcrun", [
+            "simctl",
+            "privacy",
+            udid,
+            String(request.permission),
+            String(request.service),
+            request.bundleId,
+          ])
+          return { ok: true, message: `${request.service} permission ${request.permission}.` }
+        }
+        if (action === "push") {
+          const request = value as { bundleId?: unknown; message?: unknown }
+          if (
+            !request ||
+            typeof request.bundleId !== "string" ||
+            request.bundleId.length > 200 ||
+            !bundlePattern.test(request.bundleId) ||
+            typeof request.message !== "string" ||
+            !request.message.trim() ||
+            request.message.length > 1000
+          ) {
+            throw new Error("Enter an app bundle ID and notification text.")
+          }
+          const directory = await fs.promises.mkdtemp(
+            path.join(app.getPath("temp"), "reactotron-push-")
+          )
+          try {
+            const payloadPath = path.join(directory, "notification.json")
+            await fs.promises.writeFile(
+              payloadPath,
+              JSON.stringify({ aps: { alert: request.message.trim() } })
+            )
+            await runCommand("xcrun", ["simctl", "push", udid, request.bundleId, payloadPath])
+          } finally {
+            await fs.promises.rm(directory, { recursive: true, force: true })
+          }
+          return { ok: true, message: "Test notification sent." }
+        }
+        throw new Error("Unsupported simulator tool.")
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
+    }
+  )
 
   ipcMain.handle("reload-ios-simulator", async () => {
     const metroPort = Number(process.env.REACTOTRON_METRO_PORT ?? process.env.METRO_PORT ?? 8081)

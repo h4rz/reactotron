@@ -4493,6 +4493,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@expo/serve-sim@npm:0.4.0":
+  version: 0.4.0
+  resolution: "@expo/serve-sim@npm:0.4.0"
+  dependencies:
+    inspect-webkit: "npm:^0.0.5"
+    sonner: "npm:^2.0.7"
+    ws: "npm:^8.21.0"
+  bin:
+    serve-sim: dist/serve-sim.js
+  conditions: cpu=arm64
+  languageName: node
+  linkType: hard
+
 "@expo/spawn-async@npm:^1.5.0, @expo/spawn-async@npm:^1.7.2":
   version: 1.7.2
   resolution: "@expo/spawn-async@npm:1.7.2"
@@ -27065,6 +27078,7 @@ __metadata:
     "@babel/preset-react": "npm:^7.22.15"
     "@babel/preset-typescript": "npm:^7.23.2"
     "@electron/notarize": "npm:^2.1.0"
+    "@expo/serve-sim": "npm:0.4.0"
     "@h4rz/serve-sim-device": "git@github.com:h4rz/serve-sim.git#workspace=@h4rz/serve-sim-device&commit=d6bed84996c162cfcdf2c9c95bf77e0323ac6eae"
     "@hurajgor/reactotron-core-contract": "workspace:*"
     "@hurajgor/reactotron-core-ui": "workspace:*"
@@ -27120,6 +27134,9 @@ __metadata:
     ts-jest: "npm:^29.1.1"
     typescript: "npm:^4.9.5"
     v8-compile-cache: "npm:^2.4.0"
+  dependenciesMeta:
+    "@expo/serve-sim":
+      optional: true
   languageName: unknown
   linkType: soft
 

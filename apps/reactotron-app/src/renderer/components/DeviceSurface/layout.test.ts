@@ -54,6 +54,8 @@ describe("fitDeviceFrameToPane", () => {
       resolveVisualScreenAspectRatio({ width: 390, height: 844 }, "landscape_left")
     ).toBeCloseTo(844 / 390)
     expect(resolveStreamRotation({ width: 390, height: 844 }, "landscape_left")).toBe(90)
+    expect(resolveStreamRotation({ width: 390, height: 844 }, "landscape_right")).toBe(-90)
+    expect(resolveStreamRotation({ width: 844, height: 390 }, "portrait_upside_down")).toBe(90)
     expect(resolveStreamRotation({ width: 844, height: 390 }, "landscape_left")).toBe(0)
   })
 
@@ -68,6 +70,43 @@ describe("fitDeviceFrameToPane", () => {
     expect(parseSimulatorScreenConfigFrame(frame)).toEqual({
       screenSize: { width: 844, height: 390 },
       orientation: "landscape_left",
+    })
+  })
+
+  it("reads supported Duo state without trusting invalid hinge data", () => {
+    const payload = new TextEncoder().encode(
+      JSON.stringify({
+        width: 1170,
+        height: 2532,
+        orientation: "portrait",
+        supportsHingeAngle: true,
+        hingeAngle: 90,
+        hingePose: "laptop",
+        screenId: 3,
+      })
+    )
+    const frame = new Uint8Array(payload.length + 1)
+    frame[0] = 130
+    frame.set(payload, 1)
+
+    expect(parseSimulatorScreenConfigFrame(frame)).toEqual({
+      screenSize: { width: 1170, height: 2532 },
+      orientation: "portrait",
+      supportsHingeAngle: true,
+      hingeAngle: 90,
+      hingePose: "laptop",
+      screenId: 3,
+    })
+
+    const invalid = new TextEncoder().encode(
+      JSON.stringify({ width: 1170, height: 2532, hingeAngle: 240, screenId: "3" })
+    )
+    const invalidFrame = new Uint8Array(invalid.length + 1)
+    invalidFrame[0] = 130
+    invalidFrame.set(invalid, 1)
+    expect(parseSimulatorScreenConfigFrame(invalidFrame)).toEqual({
+      screenSize: { width: 1170, height: 2532 },
+      orientation: undefined,
     })
   })
 

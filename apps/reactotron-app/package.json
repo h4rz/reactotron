@@ -159,7 +159,8 @@
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "asarUnpack": [
-        "node_modules/serve-sim/**"
+        "node_modules/serve-sim/**",
+        "node_modules/@expo/serve-sim/**"
       ]
     },
     "publish": {
@@ -170,7 +171,8 @@
     "win": {
       "icon": "./icon.png",
       "files": [
-        "!**/node_modules/serve-sim{,/**}"
+        "!**/node_modules/serve-sim{,/**}",
+        "!**/node_modules/@expo/serve-sim{,/**}"
       ],
       "target": [
         "nsis",
@@ -179,7 +181,8 @@
     },
     "linux": {
       "files": [
-        "!**/node_modules/serve-sim{,/**}"
+        "!**/node_modules/serve-sim{,/**}",
+        "!**/node_modules/@expo/serve-sim{,/**}"
       ],
       "target": [
         "deb",
@@ -229,5 +232,8 @@
       "react-hooks/exhaustive-deps": "warn",
       "react/prop-types": 0
     }
+  },
+  "optionalDependencies": {
+    "@expo/serve-sim": "0.4.0"
   }
 }

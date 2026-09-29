@@ -15,7 +15,11 @@ export type DeviceFrameLayout = {
 
 export type SimulatorScreenConfig = {
   screenSize: PaneSize
-  orientation?: "portrait" | "landscape_left"
+  orientation?: "portrait" | "landscape_left" | "portrait_upside_down" | "landscape_right"
+  supportsHingeAngle?: boolean
+  hingeAngle?: number
+  hingePose?: "closed" | "book" | "open" | "laptop" | "tent"
+  screenId?: number
 }
 
 const fitMarginPx = 0.5
@@ -48,7 +52,7 @@ export function resolveDeviceFrameKind(
 
 export function resolveVisualScreenAspectRatio(
   screenSize: PaneSize | undefined,
-  orientation: "portrait" | "landscape_left"
+  orientation: NonNullable<SimulatorScreenConfig["orientation"]>
 ): number {
   // serve-sim may retain portrait pixel dimensions after a successful rotate.
   // Match Orca: the visual screen follows the requested orientation while the
@@ -57,18 +61,19 @@ export function resolveVisualScreenAspectRatio(
   const height = screenSize?.height ?? 19.5
   const shortSide = Math.min(width, height)
   const longSide = Math.max(width, height)
-  return orientation === "landscape_left" ? longSide / shortSide : shortSide / longSide
+  return orientation.startsWith("landscape") ? longSide / shortSide : shortSide / longSide
 }
 
 export function resolveStreamRotation(
   screenSize: PaneSize | undefined,
-  orientation: "portrait" | "landscape_left"
+  orientation: NonNullable<SimulatorScreenConfig["orientation"]>
 ): -90 | 0 | 90 {
   if (!screenSize || screenSize.width === screenSize.height) return 0
   const streamIsLandscape = screenSize.width > screenSize.height
-  const visualIsLandscape = orientation === "landscape_left"
+  const visualIsLandscape = orientation.startsWith("landscape")
   if (streamIsLandscape === visualIsLandscape) return 0
-  return visualIsLandscape ? 90 : -90
+  if (visualIsLandscape) return orientation === "landscape_right" ? -90 : 90
+  return orientation === "portrait_upside_down" ? 90 : -90
 }
 
 export function mapPointToStream(
@@ -91,6 +96,10 @@ export function parseSimulatorScreenConfigFrame(
       width?: unknown
       height?: unknown
       orientation?: unknown
+      supportsHingeAngle?: unknown
+      hingeAngle?: unknown
+      hingePose?: unknown
+      screenId?: unknown
     }
     if (
       typeof config.width !== "number" ||
@@ -106,9 +115,31 @@ export function parseSimulatorScreenConfigFrame(
     return {
       screenSize: { width: config.width, height: config.height },
       orientation:
-        config.orientation === "portrait" || config.orientation === "landscape_left"
+        config.orientation === "portrait" ||
+        config.orientation === "landscape_left" ||
+        config.orientation === "portrait_upside_down" ||
+        config.orientation === "landscape_right"
           ? config.orientation
           : undefined,
+      ...(typeof config.supportsHingeAngle === "boolean"
+        ? { supportsHingeAngle: config.supportsHingeAngle }
+        : {}),
+      ...(typeof config.hingeAngle === "number" &&
+      Number.isFinite(config.hingeAngle) &&
+      config.hingeAngle >= 0 &&
+      config.hingeAngle <= 180
+        ? { hingeAngle: config.hingeAngle }
+        : {}),
+      ...(config.hingePose === "closed" ||
+      config.hingePose === "book" ||
+      config.hingePose === "open" ||
+      config.hingePose === "laptop" ||
+      config.hingePose === "tent"
+        ? { hingePose: config.hingePose }
+        : {}),
+      ...(typeof config.screenId === "number" && Number.isInteger(config.screenId)
+        ? { screenId: config.screenId }
+        : {}),
     }
   } catch {
     return null

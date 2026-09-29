@@ -17,7 +17,7 @@ import childProcess from "child_process"
 
 // Matches how startServeSim launches the CLI: Electron re-invoked as Node with
 // the bundled serve-sim entry point as its script argument.
-const SERVE_SIM_COMMAND = /node_modules\/serve-sim\/dist\/serve-sim\.js/
+const SERVE_SIM_COMMAND = /node_modules\/(?:@expo\/)?serve-sim\/dist\/serve-sim\.js/
 
 type ProcessEntry = { pid: number; ppid: number }
 

@@ -77,6 +77,7 @@ function TimelineRoute() {
 
 function App() {
   const [isDeviceSurfaceOpen, setIsDeviceSurfaceOpen] = useState(true)
+  const [isDeviceSurfaceFloating, setIsDeviceSurfaceFloating] = useState(false)
 
   return (
     <Router>
@@ -114,17 +115,23 @@ function App() {
                 <Route path="/help" element={<Help />} />
               </Routes>
             </MainContainer>
-            <DeviceSurface isOpen={isDeviceSurfaceOpen} />
-            <PanelToggle
-              type="button"
-              $isOpen={isDeviceSurfaceOpen}
-              title={isDeviceSurfaceOpen ? "Hide simulator panel" : "Show simulator panel"}
-              aria-label={isDeviceSurfaceOpen ? "Hide simulator panel" : "Show simulator panel"}
-              aria-pressed={isDeviceSurfaceOpen}
-              onClick={() => setIsDeviceSurfaceOpen((isOpen) => !isOpen)}
-            >
-              <LuPanelRight size={18} />
-            </PanelToggle>
+            <DeviceSurface
+              isOpen={isDeviceSurfaceOpen}
+              onClose={() => setIsDeviceSurfaceOpen(false)}
+              onFloatingChange={setIsDeviceSurfaceFloating}
+            />
+            {(!isDeviceSurfaceOpen || !isDeviceSurfaceFloating) && (
+              <PanelToggle
+                type="button"
+                $isOpen={isDeviceSurfaceOpen}
+                title={isDeviceSurfaceOpen ? "Hide simulator panel" : "Show simulator panel"}
+                aria-label={isDeviceSurfaceOpen ? "Hide simulator panel" : "Show simulator panel"}
+                aria-pressed={isDeviceSurfaceOpen}
+                onClick={() => setIsDeviceSurfaceOpen((isOpen) => !isOpen)}
+              >
+                <LuPanelRight size={18} />
+              </PanelToggle>
+            )}
           </TopSection>
           <Footer />
         </AppContainer>

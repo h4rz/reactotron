@@ -2135,10 +2135,22 @@ function uniqueSorted(values: string[]) {
   )
 }
 
+// Commands are immutable, so each one's item (and its serialized searchText) is built once.
+// Rebuilding every item per incoming command re-serialized multi-MB response bodies on each
+// log and exhausted the renderer heap.
+const itemCache = new WeakMap<Command, ConsoleItem>()
+
 function buildItems(commands: Command[]): ConsoleItem[] {
   return commands
     .filter((command) => command.type === "api.response" || command.type === "log")
-    .map((command) => (command.type === "api.response" ? networkItem(command) : logItem(command)))
+    .map((command) => {
+      let item = itemCache.get(command)
+      if (!item) {
+        item = command.type === "api.response" ? networkItem(command) : logItem(command)
+        itemCache.set(command, item)
+      }
+      return item
+    })
 }
 
 function networkItem(command: Command): ConsoleItem {

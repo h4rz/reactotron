@@ -2244,6 +2244,9 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   useEffect(() => {
     const handleShortcut = (event: Event) => {
       const shortcut = (event as CustomEvent<DeviceCommand>).detail
+      // Shortcuts act on the device in the selected tab only. Open devices in
+      // other tabs used to receive them too, so one screenshot raised two dialogs.
+      if (isChoosing) return
       if (activeSurface) {
         if (shortcut === "home") runSurfaceCommand("home").catch(() => undefined)
         if (shortcut === "reload") reload().catch(() => undefined)
@@ -2257,7 +2260,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
         if (shortcut === "record") toggleRecording().catch(() => undefined)
         if (shortcut === "appearance") toggleAppearance().catch(() => undefined)
       }
-      if (activeAndroidDevice) {
+      if (isAndroidSurfaceActive) {
         if (shortcut === "home" || shortcut === "back" || shortcut === "recents") {
           runAndroidCommand(shortcut).catch(() => undefined)
         }
@@ -2274,8 +2277,9 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       window.removeEventListener(deviceCommandEvent, handleShortcut)
     }
   }, [
-    activeAndroidDevice,
     activeSurface,
+    isAndroidSurfaceActive,
+    isChoosing,
     reconnect,
     reload,
     runAndroidCommand,

@@ -2,6 +2,24 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [3.16.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.15.0...reactotron-app@3.16.0) (2026-10-01)
+
+
+### Features
+
+* **app:** add developer tools for simulators and devices ([267aae2](https://github.com/hurajgor/reactotron/commit/267aae27bc12a716714bf66bf7c86abfea09c2b4))
+* **app:** add media, biometrics, reset and diagnostics device tools ([93ed504](https://github.com/hurajgor/reactotron/commit/93ed5049e180640b00f9fcd716a6eed145c47038))
+* **app:** render device hub previews as interactive 3D devices ([f040328](https://github.com/hurajgor/reactotron/commit/f040328b81e7adfbb1692a191dde9208a4577911))
+* **app:** show platform logos on fixed-width device tabs ([35e4411](https://github.com/hurajgor/reactotron/commit/35e4411bb3aa980d812ab4267a3fc16e207bedc3))
+
+
+### Bug Fixes
+
+* **app:** build timeline items once per command ([c63a5d6](https://github.com/hurajgor/reactotron/commit/c63a5d6d89d77db489244adf8edde77a638f4b89))
+* **app:** confirm simulator recordings start and stop stale recorders ([252ab60](https://github.com/hurajgor/reactotron/commit/252ab604fda3ed0ab85243a6957c185d1c6ba5b9))
+* **app:** free device shortcuts from menu accelerators ([20aadbe](https://github.com/hurajgor/reactotron/commit/20aadbe265dca09459ab7de4b537bd87b143b182))
+* **app:** send device shortcuts to the selected device only ([c993a1a](https://github.com/hurajgor/reactotron/commit/c993a1ad9b1adaaa33bd092690c9d8f8f12acf99))
+
 ## [3.15.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.14.6...reactotron-app@3.15.0) (2026-09-29)
 
 

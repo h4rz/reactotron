@@ -1,9 +1,21 @@
 # Third-party notices
 
-## T3 Code theme palettes
+## T3 Code theme palettes and 3D device scene
 
 The Ocean and Iris theme palettes are adapted from
 [T3 Code](https://github.com/pingdotgg/t3code).
+
+The device hub's procedural 3D device bodies, rotation spring, camera framing and pointer
+interaction (`src/renderer/components/DeviceSurface/scene/`) are adapted from T3 Code's
+`packages/client-runtime/src/device` and `apps/web/src/components/device`. Only T3 Code's
+source code is used; its device models are Apple assets without a redistribution license and
+are not included. When an app on the same machine already ships converted copies (such as an
+installed T3 Code), the device hub reads them from that app at runtime; Reactotron never copies,
+bundles or publishes them.
+
+Android devices use Google's official emulator skins (front-face artwork, camera cutout mask and
+display layout) from the Android SDK or Android Studio installed on the same machine, read at
+runtime. Reactotron does not bundle or publish them.
 
 MIT License
 

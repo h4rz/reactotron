@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ipcRenderer } from "electron"
 import { MdAdd, MdClose, MdPhoneIphone, MdRefresh } from "react-icons/md"
-import { LuPanelRight } from "react-icons/lu"
 import {
   FiArrowLeft,
+  FiBox,
   FiCamera,
+  FiCompass,
   FiCrosshair,
   FiDisc,
   FiGrid,
@@ -12,9 +13,6 @@ import {
   FiLink,
   FiMoon,
   FiMoreHorizontal,
-  FiMove,
-  FiMinimize2,
-  FiMaximize2,
   FiPower,
   FiRefreshCw,
   FiRotateCw,
@@ -43,7 +41,12 @@ import {
   type DeviceFrameLayout,
 } from "./layout"
 import { AvccStreamParser, avcCodecString } from "./avccStream"
+import DeviceViewport, { useFrameSignal, type SourceLimit } from "./DeviceViewport"
 import { createMjpegFrameParser } from "./mjpegFrameParser"
+import { resolveDeviceModelId } from "./scene/modelScene"
+import type { DeviceOrientation, ScreenPoint } from "./scene/phoneScene"
+import { resolveDeviceShape } from "./scene/shapeProfile"
+import type { DuoState } from "./scene/viewer"
 
 import { getConfiguredServerPort } from "../../config"
 
@@ -101,6 +104,15 @@ const duoPoses: Array<{ id: DuoPose; label: string }> = [
   { id: "tent", label: "Tent" },
 ]
 
+// Hinge angles for each pose, used until serve-sim reports a measured angle.
+const duoPoseAngles: Record<DuoPose, number> = {
+  closed: 0,
+  book: 90,
+  open: 180,
+  laptop: 90,
+  tent: 80,
+}
+
 function DuoPoseGlyph({ pose }: { pose: DuoPose }) {
   const paths: Record<DuoPose, string> = {
     closed: "M10 4v16m4-16v16",
@@ -127,80 +139,22 @@ const PREVIEW_RETRY_DELAY = 1000
 const PREVIEW_RETRY_LIMIT = 4
 const IOS_DECODE_QUEUE_LIMIT = 8
 const IOS_FRAME_DURATION_MICROSECONDS = 16_667
-const FLOATING_DEVICE_WIDTH = 344
-const FLOATING_DEVICE_HEIGHT = 720
-type FloatingResizeDirection =
-  | "north"
-  | "south"
-  | "east"
-  | "west"
-  | "northeast"
-  | "northwest"
-  | "southeast"
-  | "southwest"
-type FloatingGesture = {
-  pointerId: number
-  pointerX: number
-  pointerY: number
-  position: { x: number; y: number }
-  size: { width: number; height: number }
-  direction: FloatingResizeDirection | null
-}
-
-const floatingResizeHandles: Array<{
-  direction: FloatingResizeDirection
-  style: React.CSSProperties
-}> = [
-  { direction: "north", style: { top: -4, left: 16, right: 16, height: 8, cursor: "ns-resize" } },
-  {
-    direction: "south",
-    style: { bottom: -4, left: 16, right: 16, height: 8, cursor: "ns-resize" },
-  },
-  { direction: "east", style: { right: -4, top: 16, bottom: 16, width: 8, cursor: "ew-resize" } },
-  { direction: "west", style: { left: -4, top: 16, bottom: 16, width: 8, cursor: "ew-resize" } },
-  {
-    direction: "northeast",
-    style: { right: -8, top: -8, width: 16, height: 16, cursor: "nesw-resize" },
-  },
-  {
-    direction: "northwest",
-    style: { left: -8, top: -8, width: 16, height: 16, cursor: "nwse-resize" },
-  },
-  {
-    direction: "southeast",
-    style: { right: -8, bottom: -8, width: 16, height: 16, cursor: "nwse-resize" },
-  },
-  {
-    direction: "southwest",
-    style: { left: -8, bottom: -8, width: 16, height: 16, cursor: "nesw-resize" },
-  },
-]
 const supportsIOSSimulator = isIOSSimulatorSupported(window.process.platform)
+const DEVICE_3D_STORAGE_KEY = "reactotron.deviceHub.render3d"
 
 const Panel = styled.aside<{
   $isOpen: boolean
   $isResizing: boolean
   $width: number
-  $floating: boolean
-  $floatX: number
-  $floatY: number
-  $floatWidth: number
-  $floatHeight: number
 }>`
   display: flex;
-  position: ${(props) => (props.$floating && props.$isOpen ? "absolute" : "relative")};
-  z-index: ${(props) => (props.$floating && props.$isOpen ? 8 : "auto")};
-  top: ${(props) => (props.$floating ? `${props.$floatY}px` : "auto")};
-  left: ${(props) => (props.$floating ? `${props.$floatX}px` : "auto")};
-  height: ${(props) => (props.$floating && props.$isOpen ? `${props.$floatHeight}px` : "auto")};
-  flex: 0 0 ${(props) => (props.$isOpen && !props.$floating ? `${props.$width}px` : "0")};
-  width: ${(props) =>
-    props.$isOpen ? `${props.$floating ? props.$floatWidth : props.$width}px` : "0"};
-  min-width: ${(props) => (props.$isOpen && !props.$floating ? "300px" : "0")};
-  overflow: ${(props) => (props.$floating && props.$isOpen ? "visible" : "hidden")};
-  border-left: ${(props) =>
-    props.$isOpen && !props.$floating ? `1px solid ${props.theme.borderSubtle}` : "0"};
-  background-color: ${(props) => (props.$floating ? "transparent" : props.theme.background)};
+  position: relative;
+  flex: 0 0 ${(props) => (props.$isOpen ? `${props.$width}px` : "0")};
+  width: ${(props) => (props.$isOpen ? `${props.$width}px` : "0")};
+  min-width: ${(props) => (props.$isOpen ? "300px" : "0")};
+  overflow: hidden;
+  border-left: ${(props) => (props.$isOpen ? `1px solid ${props.theme.borderSubtle}` : "0")};
+  background-color: ${(props) => props.theme.background};
   transition: ${(props) =>
     props.$isResizing ? "none" : "width 150ms ease, flex-basis 150ms ease"};
 `
@@ -244,104 +198,6 @@ const IconButton = styled.button`
   }
 `
 
-const FloatingActions = styled.div<{ $open: boolean }>`
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid ${(props) => props.theme.borderSubtle};
-  border-radius: 8px;
-  background: color-mix(in srgb, ${(props) => props.theme.surfacePanel} 92%, transparent);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
-  cursor: grab;
-  opacity: ${(props) => (props.$open ? 1 : 0)};
-  pointer-events: ${(props) => (props.$open ? "auto" : "none")};
-  touch-action: none;
-  transition: opacity 120ms ease;
-
-  &:active {
-    cursor: grabbing;
-  }
-`
-
-const FloatingAction = styled(IconButton)`
-  width: 28px;
-  height: 28px;
-
-  &:focus-visible {
-    outline: 2px solid ${(props) => props.theme.highlight};
-    outline-offset: 2px;
-  }
-`
-
-const FloatingMoveAction = styled(FloatingAction)`
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
-`
-
-const FloatingControlDot = styled.button<{ $open: boolean }>`
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: grab;
-  touch-action: none;
-
-  &::after {
-    position: absolute;
-    top: 11px;
-    right: 11px;
-    width: 8px;
-    height: 8px;
-    border: 1px solid ${(props) => props.theme.background};
-    border-radius: 50%;
-    background: ${(props) => props.theme.foregroundDark};
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
-    content: "";
-    opacity: ${(props) => (props.$open ? 0 : 1)};
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${(props) => props.theme.highlight};
-    outline-offset: -2px;
-  }
-`
-
-const FloatingControls = styled.div`
-  position: absolute;
-  z-index: 7;
-  width: 32px;
-  height: 32px;
-
-  &:hover ${FloatingActions}, &:focus-within ${FloatingActions} {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  &:hover ${FloatingControlDot}::after, &:focus-within ${FloatingControlDot}::after {
-    opacity: 0;
-  }
-`
-
-const FloatingResizeHandle = styled.div`
-  position: absolute;
-  z-index: 6;
-  touch-action: none;
-
-  &:focus-visible {
-    outline: 2px solid ${(props) => props.theme.highlight};
-  }
-`
-
 const RecordingButton = styled(IconButton)<{ $recording: boolean }>`
   width: 36px;
   min-height: 36px;
@@ -372,7 +228,7 @@ const DeviceBar = styled.div`
   height: 44px;
   min-height: 44px;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   box-sizing: border-box;
   padding: 6px 44px 6px 8px;
   overflow: hidden;
@@ -380,48 +236,93 @@ const DeviceBar = styled.div`
   background-color: ${(props) => props.theme.surfacePanel};
 `
 
-const ActiveDeviceSelect = styled.select`
-  width: 220px;
-  height: 30px;
-  flex: 0 0 220px;
+const DeviceTabs = styled.div`
+  display: flex;
   min-width: 0;
-  padding: 0 9px;
-  border: 1px solid ${(props) => props.theme.borderSubtle};
-  border-radius: 4px;
-  outline: none;
-  background: ${(props) => props.theme.surfaceRaised};
-  color: ${(props) => props.theme.foreground};
-  font-size: 12px;
+  flex: 1;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
 
-  &:focus-visible {
-    border-color: ${(props) => props.theme.highlight};
+  &::-webkit-scrollbar {
+    display: none;
   }
 `
 
-const ToolBar = styled.div<{ $floating?: boolean }>`
-  display: ${(props) => (props.$floating ? "none" : "flex")};
-  min-height: 44px;
+const DeviceTab = styled.div<{ $active: boolean }>`
+  display: flex;
+  height: 30px;
+  max-width: 200px;
+  flex: 0 1 auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  border-bottom: 1px solid ${(props) => props.theme.borderSubtle};
+  box-sizing: border-box;
+  border: 1px solid ${(props) => (props.$active ? props.theme.borderSubtle : "transparent")};
+  border-radius: 8px;
+  background: ${(props) => (props.$active ? props.theme.surfaceRaised : "transparent")};
+  color: ${(props) => (props.$active ? props.theme.foreground : props.theme.foregroundDark)};
+
+  &:hover {
+    color: ${(props) => props.theme.foreground};
+  }
 `
 
-const DeviceName = styled.div`
-  overflow: hidden;
-  color: ${(props) => props.theme.foregroundLight};
+const DeviceTabButton = styled.button`
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:focus-visible {
+    border-radius: 7px;
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: -2px;
+  }
 `
 
-const ControlsRail = styled.aside<{ $floating?: boolean }>`
+const DeviceTabClose = styled(IconButton)`
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  margin-right: 3px;
+  border-radius: 6px;
+`
+
+const StatusDot = styled.span<{ $tone: "ok" | "pending" | "recording" }>`
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: ${(props) =>
+    props.$tone === "recording"
+      ? "#ef5c62"
+      : props.$tone === "ok"
+        ? "#63b76c"
+        : props.theme.warning};
+  box-shadow: ${(props) =>
+    props.$tone === "recording" ? "0 0 0 3px rgb(239 92 98 / 0.16)" : "none"};
+`
+
+const ControlsRail = styled.aside`
   position: absolute;
   z-index: 4;
   top: 50%;
   right: 10px;
-  display: ${(props) => (props.$floating ? "none" : "flex")};
+  display: flex;
   width: 44px;
   align-items: center;
   flex-direction: column;
@@ -590,38 +491,17 @@ const PhysicalIOSPreview = styled.img`
   pointer-events: none;
 `
 
-const PreviewContainer = styled.div<{ $floating?: boolean }>`
+const PreviewContainer = styled.div`
   position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
-  background: ${(props) =>
-    props.$floating
-      ? "transparent"
-      : `radial-gradient(
-      ellipse at 50% 42%,
-      color-mix(in srgb, ${props.theme.highlight} 24%, transparent),
-      transparent 62%
+  background: radial-gradient(
+      ellipse at 50% 44%,
+      color-mix(in srgb, ${(props) => props.theme.highlight} 16%, transparent),
+      transparent 64%
     ),
-    linear-gradient(
-      145deg,
-      ${props.theme.surfaceRaised} 0%,
-      ${props.theme.background} 55%,
-      ${props.theme.backgroundDarker} 100%
-    )`};
-
-  &::before {
-    position: absolute;
-    inset: 0;
-    background-image: linear-gradient(
-      color-mix(in srgb, ${(props) => props.theme.foreground} 6%, transparent) 1px,
-      transparent 1px
-    );
-    background-size: 100% 4px;
-    content: ${(props) => (props.$floating ? "none" : '""')};
-    opacity: 0.35;
-    pointer-events: none;
-  }
+    ${(props) => props.theme.background};
 `
 
 const KeyboardNotice = styled.div`
@@ -656,7 +536,8 @@ const KeyboardAccessButton = styled.button`
   }
 `
 
-const PreviewPane = styled.div<{ $floating?: boolean }>`
+const PreviewPane = styled.div`
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -664,8 +545,69 @@ const PreviewPane = styled.div<{ $floating?: boolean }>`
   align-self: stretch;
   align-items: center;
   justify-content: center;
-  margin: ${(props) => (props.$floating ? "0" : "16px 60px 16px 10px")};
+  margin: 12px 60px 12px 10px;
   overflow: hidden;
+`
+
+const DuoBar = styled.div`
+  position: absolute;
+  z-index: 3;
+  bottom: 14px;
+  left: calc(50% - 25px);
+  display: flex;
+  max-width: calc(100% - 90px);
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 3px;
+  overflow-x: auto;
+  border: 1px solid ${(props) => props.theme.borderSubtle};
+  border-radius: 12px;
+  background: color-mix(in srgb, ${(props) => props.theme.surfacePanel} 92%, transparent);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.24);
+  scrollbar-width: none;
+  transform: translateX(-50%);
+`
+
+const DuoPoseButton = styled.button<{ $active: boolean }>`
+  display: grid;
+  width: 34px;
+  height: 30px;
+  flex: 0 0 34px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: ${(props) => (props.$active ? props.theme.surfaceRaised : "transparent")};
+  color: ${(props) => (props.$active ? props.theme.highlight : props.theme.foregroundDark)};
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: ${(props) => props.theme.foreground};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.5;
+  }
+`
+
+const DuoAngleInput = styled.input`
+  width: 96px;
+  flex: 0 0 96px;
+  margin: 0 8px 0 6px;
+  accent-color: ${(props) => props.theme.highlight};
+  cursor: pointer;
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.5;
+  }
 `
 
 const DeviceFrame = styled.div<{
@@ -809,44 +751,6 @@ const Status = styled.p<{ $error: boolean }>`
   line-height: 1.4;
 `
 
-const ConnectionStatus = styled.span<{ $connected: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 8px;
-  color: ${(props) => (props.$connected ? props.theme.foregroundDark : props.theme.warning)};
-  font-size: 11px;
-  font-weight: 500;
-
-  &::before {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: ${(props) => (props.$connected ? "#63b76c" : props.theme.warning)};
-    content: "";
-  }
-`
-
-const RecordingStatus = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 8px;
-  color: #ef5c62;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-
-  &::before {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 0 3px rgb(239 92 98 / 0.16);
-    content: "";
-  }
-`
-
 type KeyboardFrame = { type: "down" | "up"; usage: number }
 
 const keyboardUsages: Record<string, { usage: number; shift?: boolean }> = (() => {
@@ -900,6 +804,32 @@ function keyboardFrames(key: string, shift = false): KeyboardFrame[] | null {
   return mapping.shift || shift
     ? [{ type: "down", usage: 225 }, ...frames, { type: "up", usage: 225 }]
     : frames
+}
+
+/**
+ * Paint a decoded frame into the source canvas. While the 3D view is showing it
+ * sets a height limit near its own drawing size: uploading a native 1206x2622
+ * frame into WebGL every frame was the bulk of the GPU process's load, and the
+ * 3D screen is never drawn taller than its canvas anyway. Flat mode has no limit.
+ */
+function drawLimited(
+  canvas: HTMLCanvasElement,
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  limit: number | null
+) {
+  const scale = limit && height > limit ? limit / height : 1
+  const targetWidth = Math.max(1, Math.round(width * scale))
+  const targetHeight = Math.max(1, Math.round(height * scale))
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+  }
+  const context = canvas.getContext("2d")
+  if (!context) return
+  context.imageSmoothingQuality = "high"
+  context.drawImage(source, 0, 0, targetWidth, targetHeight)
 }
 
 function encodeControlFrame(tag: number, payload: object) {
@@ -1041,7 +971,8 @@ function useIOSAvccStream(
   streamUrl: string | undefined,
   enabled: boolean,
   onUnsupported: () => void,
-  frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>
+  frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>,
+  sourceLimit: SourceLimit
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onUnsupportedRef = useRef(onUnsupported)
@@ -1084,11 +1015,7 @@ function useIOSAvccStream(
     const paint = (source: CanvasImageSource, width: number, height: number) => {
       const canvas = canvasRef.current
       if (disposed || !canvas) return
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width
-        canvas.height = height
-      }
-      canvas.getContext("2d")?.drawImage(source, 0, 0, width, height)
+      drawLimited(canvas, source, width, height, sourceLimit.height)
       if (streamUrl) frameListener.current?.(streamUrl)
       attempts = 0
       setIsStreaming(true)
@@ -1203,7 +1130,7 @@ function useIOSAvccStream(
       closeDecoder()
       setIsStreaming(false)
     }
-  }, [enabled, frameListener, streamUrl])
+  }, [enabled, frameListener, sourceLimit, streamUrl])
 
   return { canvasRef, isStreaming }
 }
@@ -1211,7 +1138,8 @@ function useIOSAvccStream(
 function useIOSVideoStream(
   streamUrl: string | undefined,
   enabled: boolean,
-  frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>
+  frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>,
+  sourceLimit: SourceLimit
 ) {
   const supportsAvcc =
     typeof (globalThis as any).VideoDecoder === "function" &&
@@ -1224,7 +1152,8 @@ function useIOSVideoStream(
     streamUrl,
     enabled && !useMjpegFallback,
     () => setUseMjpegFallback(true),
-    frameListener
+    frameListener,
+    sourceLimit
   )
   const mjpeg = useIOSMjpegStream(streamUrl, enabled && useMjpegFallback)
 
@@ -1239,11 +1168,15 @@ function useIOSVideoStream(
 function useAndroidVideoStream(
   deviceId: string | undefined,
   enabled: boolean,
-  onSize: (size: { width: number; height: number }) => void
+  onSize: (size: { width: number; height: number }) => void,
+  onFrame: () => void,
+  sourceLimit: SourceLimit
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onSizeRef = useRef(onSize)
   onSizeRef.current = onSize
+  const onFrameRef = useRef(onFrame)
+  onFrameRef.current = onFrame
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1258,6 +1191,7 @@ function useAndroidVideoStream(
     const streamId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const canvas = canvasRef.current
     const context = canvas?.getContext("2d")
+    let lastFrameSize = { width: 0, height: 0 }
     let disposed = false
     let configured = false
     let timestamp = 0
@@ -1273,12 +1207,15 @@ function useAndroidVideoStream(
     const decoder = new VideoDecoderConstructor({
       output: (frame: any) => {
         if (!disposed && canvas && context) {
-          if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
-            canvas.width = frame.displayWidth
-            canvas.height = frame.displayHeight
-            onSizeRef.current({ width: frame.displayWidth, height: frame.displayHeight })
+          if (
+            lastFrameSize.width !== frame.displayWidth ||
+            lastFrameSize.height !== frame.displayHeight
+          ) {
+            lastFrameSize = { width: frame.displayWidth, height: frame.displayHeight }
+            onSizeRef.current(lastFrameSize)
           }
-          context.drawImage(frame, 0, 0)
+          drawLimited(canvas, frame, frame.displayWidth, frame.displayHeight, sourceLimit.height)
+          onFrameRef.current()
         }
         frame.close()
       },
@@ -1356,33 +1293,34 @@ function useAndroidVideoStream(
       stop()
       if (decoder.state !== "closed") decoder.close()
     }
-  }, [deviceId, enabled])
+  }, [deviceId, enabled, sourceLimit])
 
   return { canvasRef, error }
 }
 
-function DeviceSurface({
-  isOpen,
-  onClose,
-  onFloatingChange,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  onFloatingChange: (floating: boolean) => void
-}) {
+function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const { bindings } = useKeybindings()
   const panelRef = useRef<HTMLElement>(null)
   const [previewPane, setPreviewPane] = useState<HTMLDivElement | null>(null)
   const [isResizing, setIsResizing] = useState(false)
   const [panelWidth, setPanelWidth] = useState(400)
-  const [isFloating, setIsFloating] = useState(false)
-  const [floatingControlsOpen, setFloatingControlsOpen] = useState(false)
-  const floatingGestureRef = useRef<FloatingGesture | null>(null)
-  const [floatPosition, setFloatPosition] = useState({ x: 0, y: 52 })
-  const [floatSize, setFloatSize] = useState({
-    width: FLOATING_DEVICE_WIDTH,
-    height: FLOATING_DEVICE_HEIGHT,
-  })
+  const [prefers3D, setPrefers3D] = useState(
+    () => window.localStorage.getItem(DEVICE_3D_STORAGE_KEY) !== "false"
+  )
+  const [webglUnavailable, setWebglUnavailable] = useState(false)
+  const render3D = prefers3D && !webglUnavailable
+  const frames = useFrameSignal()
+  const resetPoseRef = useRef<(() => void) | null>(null)
+  const onResetReady = useCallback((reset: (() => void) | null) => {
+    resetPoseRef.current = reset
+  }, [])
+  const on3DUnavailable = useCallback(() => setWebglUnavailable(true), [])
+  const toggle3D = () => {
+    const next = !render3D
+    window.localStorage.setItem(DEVICE_3D_STORAGE_KEY, String(next))
+    setPrefers3D(next)
+    setWebglUnavailable(false)
+  }
   const [deviceFrameLayout, setDeviceFrameLayout] = useState<DeviceFrameLayout | null>(null)
   const [simulators, setSimulators] = useState<Simulator[]>([])
   const [physicalIOSDevices, setPhysicalIOSDevices] = useState<PhysicalIOSDevice[]>([])
@@ -1423,6 +1361,8 @@ function DeviceSurface({
     y: number
   } | null>(null)
   const physicalTouchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+  const iosTouchActiveRef = useRef(false)
+  const [duoAngleDraft, setDuoAngleDraft] = useState<number | null>(null)
   const iosFrameListener = useRef<((sourceUrl: string) => void) | null>(null)
   const duoRequestRef = useRef<{ id: number; timer: number } | null>(null)
   const nextDuoRequestIdRef = useRef(1)
@@ -1455,12 +1395,6 @@ function DeviceSurface({
   )
   const activePhysicalIOS =
     physicalIOSSurface?.udid === activePhysicalIOSUdid ? physicalIOSSurface : null
-  useEffect(() => {
-    if (isFloating && !activeSurface && !activePhysicalIOS && !activeAndroidDevice) {
-      setIsFloating(false)
-      onFloatingChange(false)
-    }
-  }, [isFloating, activeSurface, activePhysicalIOS, activeAndroidDevice, onFloatingChange])
   const isAndroidSurfaceActive =
     activeAndroidDevice !== null && activeUdid === null && activePhysicalIOS === null
   const activeWsUrl = isOpen ? activeSurface?.wsUrl : undefined
@@ -1474,6 +1408,7 @@ function DeviceSurface({
   iosFrameListener.current = (sourceUrl) => {
     if (sourceUrl !== activeVideoStreamUrlRef.current) return
     if (duoAwaitFrameRef.current && !duoRequestRef.current) duoAwaitFrameRef.current = false
+    frames.notify()
   }
   const activeScreenAspectRatio = activePhysicalIOS
     ? activePhysicalIOS.screenSize.width / activePhysicalIOS.screenSize.height
@@ -1507,7 +1442,8 @@ function DeviceSurface({
   } = useIOSVideoStream(
     activeVideoStreamUrl,
     isOpen && Boolean(activeSurface) && !isChoosing,
-    iosFrameListener
+    iosFrameListener,
+    frames.limit
   )
 
   useEffect(() => {
@@ -1520,7 +1456,9 @@ function DeviceSurface({
   const { canvasRef: androidVideoCanvasRef, error: androidVideoError } = useAndroidVideoStream(
     activeAndroidDevice?.id,
     isOpen && isAndroidSurfaceActive && !isChoosing,
-    setAndroidScreenSize
+    setAndroidScreenSize,
+    frames.notify,
+    frames.limit
   )
 
   useEffect(() => {
@@ -2183,20 +2121,6 @@ function DeviceSurface({
     setIsError(!result.ok)
   }
 
-  const activeDeviceValue = isChoosing
-    ? ""
-    : activeSurface
-      ? `ios:${activeSurface.udid}`
-      : activePhysicalIOS
-        ? `physical-ios:${activePhysicalIOS.udid}`
-        : activeAndroidDevice
-          ? `android:${activeAndroidDevice.id}`
-          : ""
-  const openDeviceCount =
-    surfaces.length + (activeAndroidDevice ? 1 : 0) + (physicalIOSSurface ? 1 : 0)
-  const activeDeviceName =
-    activeSurface?.name ?? activePhysicalIOS?.name ?? activeAndroidDevice?.model
-
   const selectActiveDevice = (value: string) => {
     if (value.startsWith("ios:")) {
       setActiveUdid(value.slice("ios:".length))
@@ -2221,18 +2145,6 @@ function DeviceSurface({
       setActivePhysicalIOSUdid(null)
       setIsChoosing(false)
     }
-  }
-
-  const closeActiveDevice = () => {
-    if (activeSurface) {
-      closeSurface(activeSurface.udid).catch(() => undefined)
-      return
-    }
-    if (activePhysicalIOS) {
-      closePhysicalIOSSurface().catch(() => undefined)
-      return
-    }
-    if (activeAndroidDevice && !isChoosing) closeAndroidSurface()
   }
 
   const takeScreenshot = useCallback(async () => {
@@ -2524,11 +2436,13 @@ function DeviceSurface({
     }
   }, [])
 
-  const setDuoPose = (pose: DuoPose) => {
+  const sendDuoCommand = (
+    command: { control: "pose"; value: DuoPose } | { control: "angle"; value: number }
+  ) => {
     if (duoRequestRef.current || !activeSurface?.supportsHingeAngle) return
     const id = nextDuoRequestIdRef.current++
     duoAwaitFrameRef.current = true
-    const sent = sendControl(0x10, { requestId: id, command: { control: "pose", value: pose } })
+    const sent = sendControl(0x10, { requestId: id, command })
     if (!sent) {
       duoAwaitFrameRef.current = false
       setStatus("Duo controls are disconnected. Reconnect the simulator preview.")
@@ -2544,6 +2458,13 @@ function DeviceSurface({
     }, 5000)
     duoRequestRef.current = { id, timer }
     setDuoPending(true)
+  }
+
+  // The slider moves freely while held; only the released angle goes to the hinge.
+  const commitDuoAngle = () => {
+    if (duoAngleDraft === null) return
+    sendDuoCommand({ control: "angle", value: duoAngleDraft })
+    setDuoAngleDraft(null)
   }
 
   const sendKeyboardFrames = useCallback(
@@ -2648,116 +2569,103 @@ function DeviceSurface({
     window.addEventListener("blur", finishResize)
   }
 
-  const toggleFloating = () => {
-    if (!isFloating) {
-      const parent = panelRef.current?.parentElement
-      const parentWidth = parent?.clientWidth ?? window.innerWidth
-      const parentHeight = parent?.clientHeight ?? window.innerHeight
-      const scale = Math.min(
-        1,
-        (parentWidth - 16) / floatSize.width,
-        (parentHeight - 24) / floatSize.height
-      )
-      const width = Math.max(180, Math.floor(floatSize.width * scale))
-      const height = Math.max(320, Math.floor(floatSize.height * scale))
-      setFloatSize({ width, height })
-      setFloatPosition({ x: Math.max(8, parentWidth - width - 24), y: 8 })
+  // Android encoders rotate the framebuffer itself, so a wide frame means the
+  // device is on its side; the 3D body turns to match and maps the picture upright.
+  const activeOrientation: DeviceOrientation = isAndroidSurfaceActive
+    ? androidScreenSize.width > androidScreenSize.height
+      ? "landscape_left"
+      : "portrait"
+    : activeSurface?.orientation ?? "portrait"
+  const activeProfile = useMemo(
+    () =>
+      resolveDeviceShape({
+        platform: isAndroidSurfaceActive ? "android" : "ios",
+        name: isAndroidSurfaceActive ? activeAndroidDevice?.model : activeSurface?.name,
+        portraitAspect: Math.min(activeScreenAspectRatio, 1 / activeScreenAspectRatio),
+      }),
+    [
+      activeAndroidDevice?.model,
+      activeScreenAspectRatio,
+      activeSurface?.name,
+      isAndroidSurfaceActive,
+    ]
+  )
+  const activeDuo: DuoState | null = activeSurface?.supportsHingeAngle
+    ? {
+        angle:
+          activeSurface.hingeAngle ??
+          (activeSurface.hingePose ? duoPoseAngles[activeSurface.hingePose] : 180),
+        // serve-sim reports screen 1 for the cover display and 3 for the inner one.
+        coverActive: activeSurface.screenId === 1,
+      }
+    : null
+
+  const onIOSTouch = (phase: "begin" | "move" | "end", point: ScreenPoint) => {
+    if (phase === "begin") {
+      iosTouchActiveRef.current = !duoRequestRef.current && !duoAwaitFrameRef.current
     }
-    setToolsOpen(false)
-    setFloatingControlsOpen(false)
-    onFloatingChange(!isFloating)
-    setIsFloating((current) => !current)
+    if (!iosTouchActiveRef.current) return
+    if (phase === "end") iosTouchActiveRef.current = false
+    sendControl(3, { type: phase, ...point })
   }
 
-  const beginFloatingGesture = (
-    event: React.PointerEvent<HTMLElement>,
-    direction: FloatingResizeDirection | null
-  ) => {
-    if (!isFloating || event.button !== 0) return
-    floatingGestureRef.current = {
-      pointerId: event.pointerId,
-      pointerX: event.clientX,
-      pointerY: event.clientY,
-      position: floatPosition,
-      size: floatSize,
-      direction,
-    }
-    event.currentTarget.setPointerCapture(event.pointerId)
-    event.preventDefault()
-    event.stopPropagation()
-    if (direction) setIsResizing(true)
-  }
-
-  const moveFloatingGesture = (event: React.PointerEvent<HTMLElement>) => {
-    const gesture = floatingGestureRef.current
-    if (!gesture || gesture.pointerId !== event.pointerId) return
-    event.stopPropagation()
-    const parent = panelRef.current?.parentElement
-    const parentWidth = parent?.clientWidth ?? window.innerWidth
-    const parentHeight = parent?.clientHeight ?? window.innerHeight
-    const deltaX = event.clientX - gesture.pointerX
-    const deltaY = event.clientY - gesture.pointerY
-    if (!gesture.direction) {
-      setFloatPosition({
-        x: Math.min(
-          Math.max(8, parentWidth - gesture.size.width - 8),
-          Math.max(8, gesture.position.x + deltaX)
-        ),
-        y: Math.min(
-          Math.max(8, parentHeight - gesture.size.height - 8),
-          Math.max(8, gesture.position.y + deltaY)
-        ),
-      })
+  const onAndroidTouch = (phase: "begin" | "move" | "end", point: ScreenPoint) => {
+    if (phase === "begin") {
+      androidTouchRef.current = {
+        pointerId: -1,
+        startX: point.x,
+        startY: point.y,
+        x: point.x,
+        y: point.y,
+      }
       return
     }
-
-    const { direction, position, size } = gesture
-    const west = direction.includes("west")
-    const east = direction.includes("east")
-    const north = direction.includes("north")
-    const south = direction.includes("south")
-    const maxWidth = west ? size.width + position.x - 8 : parentWidth - position.x - 8
-    const maxHeight = north ? size.height + position.y - 8 : parentHeight - position.y - 8
-    const ratio = size.width / size.height
-    const horizontal = deltaX * (west ? -1 : 1)
-    const vertical = deltaY * ratio * (north ? -1 : 1)
-    const delta =
-      east || west
-        ? north || south
-          ? Math.abs(horizontal) > Math.abs(vertical)
-            ? horizontal
-            : vertical
-          : horizontal
-        : vertical
-    const width = Math.round(
-      Math.min(maxWidth, maxHeight * ratio, Math.max(180, size.width + delta))
-    )
-    const height = Math.round(width / ratio)
-    setFloatSize({ width, height })
-    setFloatPosition({
-      x: west ? position.x + size.width - width : position.x,
-      y: north ? position.y + size.height - height : position.y,
-    })
+    const touch = androidTouchRef.current
+    if (!touch) return
+    if (phase === "move") {
+      androidTouchRef.current = { ...touch, x: point.x, y: point.y }
+      return
+    }
+    androidTouchRef.current = null
+    const moved = Math.hypot(point.x - touch.startX, point.y - touch.startY) > 0.015
+    runAndroidCommand(
+      moved ? "swipe" : "tap",
+      moved
+        ? { x: touch.startX, y: touch.startY, endX: point.x, endY: point.y }
+        : { x: touch.startX, y: touch.startY }
+    ).catch(() => undefined)
   }
 
-  const endFloatingGesture = (event: React.PointerEvent<HTMLElement>) => {
-    if (floatingGestureRef.current?.pointerId !== event.pointerId) return
-    event.stopPropagation()
-    floatingGestureRef.current = null
-    setIsResizing(false)
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId)
-  }
-
-  const floatFrameInsetX = Math.max(
-    0,
-    (floatSize.width - (deviceFrameLayout?.width ?? floatSize.width)) / 2
+  const viewControls = (
+    <>
+      <RailButton
+        type="button"
+        aria-label={render3D ? "Show flat device frame" : "Show 3D device"}
+        title={
+          webglUnavailable
+            ? "3D preview is unavailable on this machine"
+            : render3D
+              ? "Show flat device frame"
+              : "Show 3D device"
+        }
+        aria-pressed={render3D}
+        $active={render3D}
+        onClick={toggle3D}
+      >
+        <FiBox size={18} />
+      </RailButton>
+      {/* Always rendered so the centered rail does not shift under the 3D toggle. */}
+      <RailButton
+        type="button"
+        aria-label="Face the device forward"
+        title="Face the device forward"
+        disabled={!render3D}
+        onClick={() => resetPoseRef.current?.()}
+      >
+        <FiCompass size={18} />
+      </RailButton>
+    </>
   )
-  const floatFrameInsetY = Math.max(
-    0,
-    (floatSize.height - (deviceFrameLayout?.height ?? floatSize.height)) / 2
-  )
-  const floatControlInset = Math.max(8, Math.round((deviceFrameLayout?.outerRadius ?? 40) * 0.55))
 
   return (
     <Panel
@@ -2765,135 +2673,9 @@ function DeviceSurface({
       $isOpen={isOpen}
       $isResizing={isResizing}
       $width={panelWidth}
-      $floating={isFloating}
-      $floatX={floatPosition.x}
-      $floatY={floatPosition.y}
-      $floatWidth={floatSize.width}
-      $floatHeight={floatSize.height}
       aria-label="mobile device surface"
     >
-      {isOpen && isFloating && (
-        <>
-          <FloatingControls
-            style={{
-              top: floatFrameInsetY + floatControlInset,
-              right: floatFrameInsetX + floatControlInset,
-            }}
-          >
-            <FloatingControlDot
-              $open={floatingControlsOpen}
-              type="button"
-              aria-label="Show floating preview controls"
-              aria-expanded={floatingControlsOpen}
-              title="Show floating preview controls"
-              onClick={() => setFloatingControlsOpen((open) => !open)}
-              onKeyDown={(event) => {
-                const deltas: Record<string, [number, number]> = {
-                  ArrowLeft: [-16, 0],
-                  ArrowRight: [16, 0],
-                  ArrowUp: [0, -16],
-                  ArrowDown: [0, 16],
-                }
-                const delta = deltas[event.key]
-                if (!delta) return
-                event.preventDefault()
-                const parent = panelRef.current?.parentElement
-                setFloatPosition((current) => ({
-                  x: Math.min(
-                    Math.max(8, (parent?.clientWidth ?? window.innerWidth) - floatSize.width - 8),
-                    Math.max(8, current.x + delta[0])
-                  ),
-                  y: Math.min(
-                    Math.max(
-                      8,
-                      (parent?.clientHeight ?? window.innerHeight) - floatSize.height - 8
-                    ),
-                    Math.max(8, current.y + delta[1])
-                  ),
-                }))
-              }}
-            />
-            <FloatingActions
-              $open={floatingControlsOpen}
-              onPointerDown={(event) => beginFloatingGesture(event, null)}
-              onPointerMove={moveFloatingGesture}
-              onPointerUp={endFloatingGesture}
-              onPointerCancel={endFloatingGesture}
-            >
-              <FloatingMoveAction
-                type="button"
-                aria-label="Move floating preview"
-                title="Drag to move floating preview"
-                onPointerDown={(event) => beginFloatingGesture(event, null)}
-                onPointerMove={moveFloatingGesture}
-                onPointerUp={endFloatingGesture}
-                onPointerCancel={endFloatingGesture}
-              >
-                <FiMove size={16} />
-              </FloatingMoveAction>
-              <FloatingAction
-                type="button"
-                aria-label="Open preview in right panel"
-                title="Open in right panel"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={toggleFloating}
-              >
-                <LuPanelRight size={16} />
-              </FloatingAction>
-              <FloatingAction
-                type="button"
-                aria-label="Close floating preview"
-                title="Close floating preview"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={onClose}
-              >
-                <FiX size={16} />
-              </FloatingAction>
-            </FloatingActions>
-          </FloatingControls>
-          {floatingResizeHandles.map(({ direction, style }) => (
-            <FloatingResizeHandle
-              key={direction}
-              style={style}
-              role={direction === "southwest" ? "separator" : "presentation"}
-              aria-label={direction === "southwest" ? "Resize floating device" : undefined}
-              aria-valuenow={direction === "southwest" ? floatSize.width : undefined}
-              aria-valuemin={direction === "southwest" ? 180 : undefined}
-              tabIndex={direction === "southwest" ? 0 : undefined}
-              onPointerDown={(event) => beginFloatingGesture(event, direction)}
-              onPointerMove={moveFloatingGesture}
-              onPointerUp={endFloatingGesture}
-              onPointerCancel={endFloatingGesture}
-              onKeyDown={
-                direction === "southwest"
-                  ? (event) => {
-                      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key))
-                        return
-                      event.preventDefault()
-                      const parent = panelRef.current?.parentElement
-                      const ratio = floatSize.width / floatSize.height
-                      const delta = event.key === "ArrowUp" || event.key === "ArrowLeft" ? -16 : 16
-                      const width = Math.round(
-                        Math.min(
-                          floatSize.width + floatPosition.x - 8,
-                          ((parent?.clientHeight ?? window.innerHeight) - floatPosition.y - 8) *
-                            ratio,
-                          Math.max(180, floatSize.width + delta)
-                        )
-                      )
-                      setFloatPosition((current) => ({
-                        ...current,
-                        x: current.x + floatSize.width - width,
-                      }))
-                      setFloatSize({ width, height: Math.round(width / ratio) })
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </>
-      )}
-      {isOpen && !isFloating && (
+      {isOpen && (
         <ResizeHandle
           role="separator"
           aria-label="Resize device panel"
@@ -2916,87 +2698,116 @@ function DeviceSurface({
       )}
       {isOpen && (
         <Content>
-          {!isFloating && (
-            <DeviceBar>
-              <ActiveDeviceSelect
-                aria-label="Active simulator or device"
-                disabled={openDeviceCount === 0}
-                value={activeDeviceValue}
-                onChange={(event) => selectActiveDevice(event.target.value)}
-              >
-                <option value="" disabled>
-                  {openDeviceCount === 0 ? "No open devices" : "Select a device"}
-                </option>
-                {surfaces.length > 0 && (
-                  <optgroup label="iOS Simulators">
-                    {surfaces.map((surface) => (
-                      <option key={surface.udid} value={`ios:${surface.udid}`}>
-                        {surface.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {physicalIOSSurface && (
-                  <optgroup label="Physical iPhone">
-                    <option value={`physical-ios:${physicalIOSSurface.udid}`}>
-                      {physicalIOSSurface.name}
-                    </option>
-                  </optgroup>
-                )}
-                {activeAndroidDevice && (
-                  <optgroup label="Android">
-                    <option value={`android:${activeAndroidDevice.id}`}>
-                      {activeAndroidDevice.model}
-                    </option>
-                  </optgroup>
-                )}
-              </ActiveDeviceSelect>
-              <IconButton
-                type="button"
-                aria-label={activeDeviceName ? `Close ${activeDeviceName}` : "Close active device"}
-                title={activeDeviceName ? `Close ${activeDeviceName}` : "Close active device"}
-                disabled={!activeDeviceName || isChoosing}
-                onClick={closeActiveDevice}
-              >
-                <MdClose size={14} />
-              </IconButton>
-              <IconButton
-                type="button"
-                aria-label="Add a mobile device"
-                title="Add a mobile device"
-                onClick={() => {
-                  setIsChoosing(true)
-                  loadSimulators().catch(() => undefined)
-                  loadPhysicalIOSDevices().catch(() => undefined)
-                  loadAndroidDevices().catch(() => undefined)
-                }}
-              >
-                <MdAdd size={19} />
-              </IconButton>
-              <IconButton
-                type="button"
-                aria-label={isFloating ? "Dock device panel" : "Float device panel over timeline"}
-                title={isFloating ? "Dock device panel" : "Float device panel over timeline"}
-                aria-pressed={isFloating}
-                disabled={!activeDeviceName || isChoosing}
-                onClick={toggleFloating}
-              >
-                {isFloating ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
-              </IconButton>
-            </DeviceBar>
-          )}
+          <DeviceBar>
+            <DeviceTabs role="tablist" aria-label="Open devices">
+              {surfaces.map((surface) => {
+                const active = !isChoosing && activeSurface?.udid === surface.udid
+                return (
+                  <DeviceTab key={surface.udid} $active={active}>
+                    <DeviceTabButton
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      title={`${surface.name} · ${surface.runtime}`}
+                      onClick={() => selectActiveDevice(`ios:${surface.udid}`)}
+                    >
+                      <StatusDot
+                        $tone={
+                          surface.recording
+                            ? "recording"
+                            : active && !isControlConnected
+                              ? "pending"
+                              : "ok"
+                        }
+                        aria-label={
+                          surface.recording
+                            ? "Recording"
+                            : active && !isControlConnected
+                              ? "Connecting"
+                              : "Connected"
+                        }
+                      />
+                      <span>{surface.name}</span>
+                    </DeviceTabButton>
+                    <DeviceTabClose
+                      type="button"
+                      aria-label={`Close ${surface.name}`}
+                      title={`Close ${surface.name}`}
+                      onClick={() => closeSurface(surface.udid).catch(() => undefined)}
+                    >
+                      <MdClose size={13} />
+                    </DeviceTabClose>
+                  </DeviceTab>
+                )
+              })}
+              {physicalIOSSurface && (
+                <DeviceTab $active={!isChoosing && Boolean(activePhysicalIOS)}>
+                  <DeviceTabButton
+                    type="button"
+                    role="tab"
+                    aria-selected={!isChoosing && Boolean(activePhysicalIOS)}
+                    title={`${physicalIOSSurface.name} · iOS ${physicalIOSSurface.productVersion} · USB, experimental`}
+                    onClick={() => selectActiveDevice(`physical-ios:${physicalIOSSurface.udid}`)}
+                  >
+                    <StatusDot $tone="ok" aria-label="Connected over USB" />
+                    <span>{physicalIOSSurface.name}</span>
+                  </DeviceTabButton>
+                  <DeviceTabClose
+                    type="button"
+                    aria-label={`Close ${physicalIOSSurface.name}`}
+                    title={`Close ${physicalIOSSurface.name}`}
+                    onClick={() => closePhysicalIOSSurface().catch(() => undefined)}
+                  >
+                    <MdClose size={13} />
+                  </DeviceTabClose>
+                </DeviceTab>
+              )}
+              {activeAndroidDevice && (
+                <DeviceTab $active={!isChoosing && isAndroidSurfaceActive}>
+                  <DeviceTabButton
+                    type="button"
+                    role="tab"
+                    aria-selected={!isChoosing && isAndroidSurfaceActive}
+                    title={`${activeAndroidDevice.model} · ${
+                      activeAndroidDevice.type === "emulator" ? "Emulator" : "Physical device"
+                    } · ${activeAndroidDevice.id}`}
+                    onClick={() => selectActiveDevice(`android:${activeAndroidDevice.id}`)}
+                  >
+                    <StatusDot
+                      $tone={isAndroidRecording ? "recording" : "ok"}
+                      aria-label={isAndroidRecording ? "Recording" : "Connected"}
+                    />
+                    <span>{activeAndroidDevice.model}</span>
+                  </DeviceTabButton>
+                  <DeviceTabClose
+                    type="button"
+                    aria-label={`Close ${activeAndroidDevice.model}`}
+                    title={`Close ${activeAndroidDevice.model}`}
+                    onClick={closeAndroidSurface}
+                  >
+                    <MdClose size={13} />
+                  </DeviceTabClose>
+                </DeviceTab>
+              )}
+            </DeviceTabs>
+            <IconButton
+              type="button"
+              aria-label="Add a mobile device"
+              title="Add a mobile device"
+              aria-pressed={isChoosing}
+              onClick={() => {
+                setIsChoosing(true)
+                loadSimulators().catch(() => undefined)
+                loadPhysicalIOSDevices().catch(() => undefined)
+                loadAndroidDevices().catch(() => undefined)
+              }}
+            >
+              <MdAdd size={19} />
+            </IconButton>
+          </DeviceBar>
           {activeSurface && !isChoosing ? (
             <>
-              <ToolBar $floating={isFloating}>
-                <DeviceName title={`${activeSurface.name} ${activeSurface.runtime}`}>
-                  {activeSurface.name}
-                  <ConnectionStatus $connected={isControlConnected}>
-                    {isControlConnected ? "Connected" : "Connecting"}
-                  </ConnectionStatus>
-                  {activeSurface.recording && <RecordingStatus>REC</RecordingStatus>}
-                </DeviceName>
-              </ToolBar>
-              {!isFloating && keyboardAccess?.required && !keyboardAccess.trusted && (
+              {keyboardAccess?.required && !keyboardAccess.trusted && (
                 <KeyboardNotice role="status">
                   <span>
                     Xcode {keyboardAccess.xcodeMajorVersion} keyboard input needs Accessibility
@@ -3010,9 +2821,28 @@ function DeviceSurface({
                   </KeyboardAccessButton>
                 </KeyboardNotice>
               )}
-              <PreviewContainer $floating={isFloating}>
-                <PreviewPane ref={setPreviewPane} $floating={isFloating}>
+              <PreviewContainer>
+                <PreviewPane ref={setPreviewPane}>
+                  {render3D && (
+                    <DeviceViewport
+                      label={`${activeSurface.name} simulator, 3D`}
+                      sourceRef={iosUsesMjpeg ? iosVideoImageRef : iosVideoCanvasRef}
+                      sourceKey={`ios:${activeSurface.udid}:${iosUsesMjpeg ? "mjpeg" : "avcc"}`}
+                      frames={frames}
+                      orientation={activeOrientation}
+                      profile={activeProfile}
+                      duo={activeDuo}
+                      modelId={resolveDeviceModelId("ios", activeSurface.name)}
+                      skinModel={null}
+                      onTouch={onIOSTouch}
+                      onUnavailable={on3DUnavailable}
+                      onResetReady={onResetReady}
+                      onKeyDown={onScreenKeyDown}
+                      onPaste={onScreenPaste}
+                    />
+                  )}
                   <DeviceFrame
+                    hidden={render3D}
                     $layout={deviceFrameLayout}
                     $platform="ios"
                     aria-label={`${activeSurface.name} simulator screen`}
@@ -3023,7 +2853,7 @@ function DeviceSurface({
                     onPointerMove={onScreenPointerMove}
                     onPointerUp={onScreenPointerEnd}
                     role="application"
-                    tabIndex={0}
+                    tabIndex={render3D ? -1 : 0}
                   >
                     {iosUsesMjpeg ? (
                       <FallbackPreview
@@ -3045,7 +2875,39 @@ function DeviceSurface({
                     )}
                   </DeviceFrame>
                 </PreviewPane>
-                <ControlsRail $floating={isFloating} aria-label="iOS simulator controls">
+                {activeSurface.supportsHingeAngle && (
+                  <DuoBar role="group" aria-label="iPhone Duo hinge">
+                    {duoPoses.map((pose) => (
+                      <DuoPoseButton
+                        key={pose.id}
+                        type="button"
+                        $active={activeSurface.hingePose === pose.id}
+                        aria-pressed={activeSurface.hingePose === pose.id}
+                        aria-label={`${pose.label} pose`}
+                        title={`${pose.label} pose`}
+                        disabled={!isControlConnected || duoPending}
+                        onClick={() => sendDuoCommand({ control: "pose", value: pose.id })}
+                      >
+                        <DuoPoseGlyph pose={pose.id} />
+                      </DuoPoseButton>
+                    ))}
+                    <DuoAngleInput
+                      type="range"
+                      min={0}
+                      max={180}
+                      step={1}
+                      aria-label="Hinge angle"
+                      title={`Hinge angle: ${Math.round(duoAngleDraft ?? activeDuo?.angle ?? 180)}°`}
+                      disabled={!isControlConnected || duoPending}
+                      value={Math.round(duoAngleDraft ?? activeDuo?.angle ?? 180)}
+                      onChange={(event) => setDuoAngleDraft(Number(event.target.value))}
+                      onPointerUp={commitDuoAngle}
+                      onKeyUp={commitDuoAngle}
+                      onBlur={() => setDuoAngleDraft(null)}
+                    />
+                  </DuoBar>
+                )}
+                <ControlsRail aria-label="iOS simulator controls">
                   <RailButton
                     type="button"
                     aria-label="Home"
@@ -3061,6 +2923,18 @@ function DeviceSurface({
                     onClick={() => reload().catch(() => undefined)}
                   >
                     <FiRefreshCw size={18} />
+                  </RailButton>
+                  <RailButton
+                    type="button"
+                    aria-label="Rotate simulator"
+                    title="Rotate simulator"
+                    onClick={() =>
+                      runSurfaceCommand(
+                        activeSurface.orientation === "portrait" ? "landscape_left" : "portrait"
+                      ).catch(() => undefined)
+                    }
+                  >
+                    <FiRotateCw size={18} />
                   </RailButton>
                   <RailButton
                     type="button"
@@ -3088,6 +2962,8 @@ function DeviceSurface({
                   >
                     <FiDisc size={18} />
                   </RecordingButton>
+                  <RailDivider />
+                  {viewControls}
                   <RailButton
                     ref={toolsTriggerRef}
                     type="button"
@@ -3101,7 +2977,7 @@ function DeviceSurface({
                     <FiMoreHorizontal size={19} />
                   </RailButton>
                 </ControlsRail>
-                {toolsOpen && !isFloating && (
+                {toolsOpen && (
                   <ToolsDrawer id="ios-device-tools" aria-label="Simulator tools">
                     <ToolsHeader>
                       <span>Simulator tools</span>
@@ -3116,16 +2992,6 @@ function DeviceSurface({
                     </ToolsHeader>
                     <ToolsSection>
                       <strong>Device</strong>
-                      <ToolsAction
-                        type="button"
-                        onClick={() =>
-                          runSurfaceCommand(
-                            activeSurface.orientation === "portrait" ? "landscape_left" : "portrait"
-                          ).catch(() => undefined)
-                        }
-                      >
-                        <FiRotateCw size={16} /> Rotate simulator
-                      </ToolsAction>
                       <ToolsAction
                         type="button"
                         onClick={() => changeSimulatorUi("text-larger").catch(() => undefined)}
@@ -3154,23 +3020,6 @@ function DeviceSurface({
                         <FiTool size={16} /> Repair keyboard and touch
                       </ToolsAction>
                     </ToolsSection>
-                    {activeSurface.supportsHingeAngle && (
-                      <ToolsSection>
-                        <strong>iPhone Duo</strong>
-                        {duoPoses.map((pose) => (
-                          <ToolsAction
-                            key={pose.id}
-                            type="button"
-                            aria-pressed={activeSurface.hingePose === pose.id}
-                            disabled={!isControlConnected || duoPending}
-                            onClick={() => setDuoPose(pose.id)}
-                          >
-                            <DuoPoseGlyph pose={pose.id} /> {pose.label}
-                            {activeSurface.hingePose === pose.id ? " · active" : ""}
-                          </ToolsAction>
-                        ))}
-                      </ToolsSection>
-                    )}
                     <ToolsSection>
                       <strong>Session</strong>
                       <ToolsAction type="button" onClick={() => shutdown().catch(() => undefined)}>
@@ -3180,20 +3029,12 @@ function DeviceSurface({
                   </ToolsDrawer>
                 )}
               </PreviewContainer>
-              {status && !isFloating && <Status $error={isError}>{status}</Status>}
+              {status && <Status $error={isError}>{status}</Status>}
             </>
           ) : activePhysicalIOS && !isChoosing ? (
             <>
-              <ToolBar $floating={isFloating}>
-                <DeviceName
-                  title={`${activePhysicalIOS.name} · iOS ${activePhysicalIOS.productVersion}`}
-                >
-                  {activePhysicalIOS.name}
-                  <ConnectionStatus $connected>USB · Experimental</ConnectionStatus>
-                </DeviceName>
-              </ToolBar>
-              <PreviewContainer $floating={isFloating}>
-                <PreviewPane ref={setPreviewPane} $floating={isFloating}>
+              <PreviewContainer>
+                <PreviewPane ref={setPreviewPane}>
                   <DeviceFrame
                     $layout={deviceFrameLayout}
                     $platform="ios"
@@ -3216,7 +3057,7 @@ function DeviceSurface({
                     <PhysicalIOSPreview src={activePhysicalIOS.streamUrl} alt="" />
                   </DeviceFrame>
                 </PreviewPane>
-                <ControlsRail $floating={isFloating} aria-label="Physical iPhone controls">
+                <ControlsRail aria-label="Physical iPhone controls">
                   <RailButton
                     type="button"
                     aria-label="Home"
@@ -3229,21 +3070,32 @@ function DeviceSurface({
                   </RailButton>
                 </ControlsRail>
               </PreviewContainer>
-              {status && !isFloating && <Status $error={isError}>{status}</Status>}
+              {status && <Status $error={isError}>{status}</Status>}
             </>
           ) : activeAndroidDevice && !isChoosing ? (
             <>
-              <ToolBar $floating={isFloating}>
-                <DeviceName title={activeAndroidDevice.id}>
-                  {activeAndroidDevice.model}
-                  <ConnectionStatus $connected>
-                    {activeAndroidDevice.type === "emulator" ? "Emulator" : "Physical device"}
-                  </ConnectionStatus>
-                </DeviceName>
-              </ToolBar>
-              <PreviewContainer $floating={isFloating}>
-                <PreviewPane ref={setPreviewPane} $floating={isFloating}>
+              <PreviewContainer>
+                <PreviewPane ref={setPreviewPane}>
+                  {render3D && (
+                    <DeviceViewport
+                      label={`${activeAndroidDevice.model} Android device, 3D`}
+                      sourceRef={androidVideoCanvasRef}
+                      sourceKey={`android:${activeAndroidDevice.id}`}
+                      frames={frames}
+                      orientation={activeOrientation}
+                      profile={activeProfile}
+                      duo={null}
+                      modelId={null}
+                      skinModel={activeAndroidDevice.model}
+                      onTouch={onAndroidTouch}
+                      onUnavailable={on3DUnavailable}
+                      onResetReady={onResetReady}
+                      onKeyDown={onAndroidKeyDown}
+                      onPaste={onAndroidPaste}
+                    />
+                  )}
                   <DeviceFrame
+                    hidden={render3D}
                     $layout={deviceFrameLayout}
                     $platform="android"
                     aria-label={`${activeAndroidDevice.model} Android screen`}
@@ -3276,12 +3128,12 @@ function DeviceSurface({
                       }
                     }}
                     role="application"
-                    tabIndex={0}
+                    tabIndex={render3D ? -1 : 0}
                   >
                     <AndroidVideoPreview ref={androidVideoCanvasRef} />
                   </DeviceFrame>
                 </PreviewPane>
-                <ControlsRail $floating={isFloating} aria-label="Android device controls">
+                <ControlsRail aria-label="Android device controls">
                   <RailButton
                     type="button"
                     aria-label="Back"
@@ -3298,6 +3150,14 @@ function DeviceSurface({
                   >
                     <FiHome size={18} />
                   </RailButton>
+                  <RailButton
+                    type="button"
+                    aria-label="Recent apps"
+                    title="Recent apps"
+                    onClick={() => runAndroidCommand("recents").catch(() => undefined)}
+                  >
+                    <FiGrid size={18} />
+                  </RailButton>
                   <RailDivider />
                   <RailButton
                     type="button"
@@ -3306,6 +3166,14 @@ function DeviceSurface({
                     onClick={() => runAndroidCommand("reload").catch(() => undefined)}
                   >
                     <FiRefreshCw size={18} />
+                  </RailButton>
+                  <RailButton
+                    type="button"
+                    aria-label="Rotate device"
+                    title="Rotate device"
+                    onClick={() => runAndroidCommand("rotate").catch(() => undefined)}
+                  >
+                    <FiRotateCw size={18} />
                   </RailButton>
                   <RailButton
                     type="button"
@@ -3338,6 +3206,8 @@ function DeviceSurface({
                   >
                     <FiDisc size={18} />
                   </RecordingButton>
+                  <RailDivider />
+                  {viewControls}
                   <RailButton
                     ref={toolsTriggerRef}
                     type="button"
@@ -3351,7 +3221,7 @@ function DeviceSurface({
                     <FiMoreHorizontal size={19} />
                   </RailButton>
                 </ControlsRail>
-                {toolsOpen && !isFloating && (
+                {toolsOpen && (
                   <ToolsDrawer id="android-device-tools" aria-label="Android device tools">
                     <ToolsHeader>
                       <span>Android device tools</span>
@@ -3368,18 +3238,6 @@ function DeviceSurface({
                       <strong>Device</strong>
                       <ToolsAction
                         type="button"
-                        onClick={() => runAndroidCommand("recents").catch(() => undefined)}
-                      >
-                        <FiGrid size={16} /> Recent apps
-                      </ToolsAction>
-                      <ToolsAction
-                        type="button"
-                        onClick={() => runAndroidCommand("rotate").catch(() => undefined)}
-                      >
-                        <FiRotateCw size={16} /> Rotate device
-                      </ToolsAction>
-                      <ToolsAction
-                        type="button"
                         onClick={() => runAndroidCommand("reverse").catch(() => undefined)}
                       >
                         <FiLink size={16} /> Configure ADB reverse for Reactotron
@@ -3388,7 +3246,7 @@ function DeviceSurface({
                   </ToolsDrawer>
                 )}
               </PreviewContainer>
-              {status && !isFloating && <Status $error={isError}>{status}</Status>}
+              {status && <Status $error={isError}>{status}</Status>}
             </>
           ) : (
             <EmptyState>

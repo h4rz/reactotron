@@ -41,12 +41,17 @@ function defaultSdkDirectories() {
   return [path.join(home, "Android", "Sdk"), path.join(home, "android-sdk")]
 }
 
-function candidatePaths() {
-  const sdkRoots = [
+/** SDK roots in lookup order: explicit environment first, then the default install location. */
+export function androidSdkDirectories() {
+  return [
     process.env.ANDROID_HOME,
     process.env.ANDROID_SDK_ROOT,
     ...defaultSdkDirectories(),
   ].filter((directory): directory is string => Boolean(directory))
+}
+
+function candidatePaths() {
+  const sdkRoots = androidSdkDirectories()
 
   return [
     process.env.REACTOTRON_ADB_PATH,

@@ -168,7 +168,7 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      webgl: false, // Disable webGL for performance reasons
+      webgl: true, // The device hub renders its 3D device bodies with WebGL
       spellcheck: false, // Disable spellcheck for performance reasons
     },
     show: false, // We don't show immediately to avoid flickering while the web content is loading.

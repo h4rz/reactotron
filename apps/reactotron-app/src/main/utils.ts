@@ -6,6 +6,7 @@ import path from "path"
 import { isIOSSimulatorSupported } from "../platform"
 import { getAdbPath } from "./adb-path"
 import { startAndroidScrcpyStream, type AndroidScrcpyStream } from "./android-scrcpy"
+import { registerDeviceModelHandlers } from "./device-models"
 import {
   closePhysicalIOSDevice,
   listPhysicalIOSDevices,
@@ -977,6 +978,8 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
     }
     return { ok: true }
   })
+
+  registerDeviceModelHandlers()
 
   ipcMain.handle("list-android-devices", async () => {
     try {

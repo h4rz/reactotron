@@ -7,7 +7,6 @@ import {
   FiBox,
   FiCamera,
   FiCompass,
-  FiCrosshair,
   FiDisc,
   FiGrid,
   FiHome,
@@ -18,7 +17,6 @@ import {
   FiRefreshCw,
   FiRotateCw,
   FiTool,
-  FiType,
   FiVolume2,
   FiVolumeX,
   FiX,
@@ -2228,20 +2226,6 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     setIsError(!result.ok)
   }, [activeSurface])
 
-  const changeSimulatorUi = useCallback(
-    async (setting: "contrast" | "text-larger" | "text-smaller") => {
-      if (!activeSurface) return
-      const result = (await ipcRenderer.invoke(
-        "ios-simulator-ui-setting",
-        activeSurface.udid,
-        setting
-      )) as IPCResponse
-      setStatus(result.message || "Could not change simulator settings.")
-      setIsError(!result.ok)
-    },
-    [activeSurface]
-  )
-
   useEffect(() => {
     const handleShortcut = (event: Event) => {
       const shortcut = (event as CustomEvent<DeviceCommand>).detail
@@ -3040,24 +3024,6 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     {toolTarget && <DeviceTools target={toolTarget} onResult={onToolResult} />}
                     <ToolsSection>
                       <strong>Device</strong>
-                      <ToolsAction
-                        type="button"
-                        onClick={() => changeSimulatorUi("text-larger").catch(() => undefined)}
-                      >
-                        <FiType size={16} /> Increase text size
-                      </ToolsAction>
-                      <ToolsAction
-                        type="button"
-                        onClick={() => changeSimulatorUi("text-smaller").catch(() => undefined)}
-                      >
-                        <FiType size={16} /> Decrease text size
-                      </ToolsAction>
-                      <ToolsAction
-                        type="button"
-                        onClick={() => changeSimulatorUi("contrast").catch(() => undefined)}
-                      >
-                        <FiCrosshair size={16} /> Toggle Increase Contrast
-                      </ToolsAction>
                       <ToolsAction type="button" onClick={() => reconnect().catch(() => undefined)}>
                         <FiLink size={16} /> Reconnect preview
                       </ToolsAction>

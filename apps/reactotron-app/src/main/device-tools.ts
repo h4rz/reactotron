@@ -2,7 +2,7 @@ import childProcess from "child_process"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { ipcMain } from "electron"
+import { BrowserWindow, dialog, ipcMain, shell } from "electron"
 
 import { getAdbPath } from "./adb-path"
 
@@ -65,7 +65,13 @@ type ServeSimRunner = (args: string[]) => {
 type AppEntry = { id: string; name?: string }
 
 export type ToolResult =
-  | { ok: true; message?: string; apps?: AppEntry[] }
+  | {
+      ok: true
+      message?: string
+      apps?: AppEntry[]
+      crashes?: Array<{ path: string; title: string; time: number }>
+      ui?: Record<string, string>
+    }
   | { ok: false; message: string }
 
 const SIMULATOR_UDID = /^[A-F0-9-]{36}$/i
@@ -106,6 +112,34 @@ const ANDROID_PERMISSIONS: Record<string, string[]> = {
   contacts: ["android.permission.READ_CONTACTS"],
   calendar: ["android.permission.READ_CALENDAR", "android.permission.WRITE_CALENDAR"],
 }
+
+const TEXT_SIZES = [
+  "extra-small",
+  "small",
+  "medium",
+  "large",
+  "extra-large",
+  "extra-extra-large",
+  "extra-extra-extra-large",
+  "accessibility-medium",
+  "accessibility-large",
+  "accessibility-extra-large",
+  "accessibility-extra-extra-large",
+  "accessibility-extra-extra-extra-large",
+]
+const ON_OFF = ["on", "off"]
+// serve-sim `ui` options and the values it accepts.
+const UI_OPTIONS: Record<string, string[]> = {
+  "text-size": TEXT_SIZES,
+  "reduce-motion": ON_OFF,
+  "increase-contrast": ON_OFF,
+  "reduce-transparency": ON_OFF,
+  "show-borders": ON_OFF,
+  voiceover: ON_OFF,
+  "liquid-glass": ["clear", "tinted"],
+  "color-filter": ["none", "grayscale", "red-green", "green-red", "blue-yellow"],
+}
+const ANDROID_FONT_SCALES = [0.85, 1, 1.15, 1.3, 1.5, 1.8, 2]
 
 export const DEVICE_TOOL_PERMISSIONS = {
   ios: IOS_PERMISSIONS,
@@ -227,6 +261,39 @@ export function registerDeviceToolHandlers(serveSim: ServeSimRunner) {
     return run(runner.command, runner.args, { env: runner.env, timeoutMs })
   }
 
+  /** devicectl acts on pids: find the running process inside the app's bundle. */
+  const physicalPid = async (target: DeviceToolTarget, appId: string) => {
+    const appsJson = await devicectl(
+      "device",
+      "info",
+      "apps",
+      "--device",
+      target.id,
+      "--json-output",
+      "-",
+      "--quiet"
+    )
+    const bundleUrl = collect(JSON.parse(appsJson), "bundleIdentifier").find(
+      (app) => app.bundleIdentifier === appId
+    )?.url
+    if (typeof bundleUrl !== "string") fail(`${appId} is not installed.`)
+    const processJson = await devicectl(
+      "device",
+      "info",
+      "processes",
+      "--device",
+      target.id,
+      "--json-output",
+      "-",
+      "--quiet"
+    )
+    const running = collect(JSON.parse(processJson), "executable").find((process) =>
+      String(process.executable).startsWith(bundleUrl)
+    )
+    if (!running || typeof running.processIdentifier !== "number") fail(`${appId} is not running.`)
+    return running.processIdentifier
+  }
+
   const handlers: Record<
     string,
     (
@@ -303,44 +370,7 @@ export function registerDeviceToolHandlers(serveSim: ServeSimRunner) {
       if (target.kind === "ios-simulator") await simctl("terminate", target.id, appId)
       else if (target.kind === "android") await adbShell(target, "am", "force-stop", appId)
       else {
-        // devicectl terminates by pid: find the running process inside the app's bundle.
-        const apps = collect(
-          JSON.parse(
-            await devicectl(
-              "device",
-              "info",
-              "apps",
-              "--device",
-              target.id,
-              "--json-output",
-              "-",
-              "--quiet"
-            )
-          ),
-          "bundleIdentifier"
-        )
-        const bundleUrl = apps.find((app) => app.bundleIdentifier === appId)?.url
-        if (typeof bundleUrl !== "string") fail(`${appId} is not installed.`)
-        const processes = collect(
-          JSON.parse(
-            await devicectl(
-              "device",
-              "info",
-              "processes",
-              "--device",
-              target.id,
-              "--json-output",
-              "-",
-              "--quiet"
-            )
-          ),
-          "executable"
-        )
-        const running = processes.find((process) =>
-          String(process.executable).startsWith(bundleUrl)
-        )
-        if (!running || typeof running.processIdentifier !== "number")
-          fail(`${appId} is not running.`)
+        const pid = await physicalPid(target, appId)
         await devicectl(
           "device",
           "process",
@@ -348,7 +378,7 @@ export function registerDeviceToolHandlers(serveSim: ServeSimRunner) {
           "--device",
           target.id,
           "--pid",
-          String(running.processIdentifier)
+          String(pid)
         )
       }
       return { ok: true, message: `Terminated ${appId}` }
@@ -536,6 +566,412 @@ export function registerDeviceToolHandlers(serveSim: ServeSimRunner) {
         throw error
       })
       return { ok: true, message: `Sent push to ${appId}` }
+    },
+
+    async "add-media"(target, args, sender) {
+      if (target.kind === "ios-physical") {
+        fail("Adding photos to a physical iPhone's library is not possible from a computer.")
+      }
+      const window = BrowserWindow.fromWebContents(sender)
+      const choice = await dialog.showOpenDialog(window ?? undefined, {
+        title: "Add photos or videos to the device",
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          {
+            name: "Photos and videos",
+            extensions: ["png", "jpg", "jpeg", "heic", "gif", "mp4", "mov", "m4v"],
+          },
+        ],
+      })
+      if (choice.canceled || choice.filePaths.length === 0) return { ok: true }
+      const files = choice.filePaths
+      if (target.kind === "ios-simulator") {
+        await simctl("addmedia", target.id, ...files)
+      } else {
+        const directory = "/sdcard/Pictures/Reactotron"
+        await adbShell(target, "mkdir", "-p", directory)
+        for (const file of files) {
+          const remote = `${directory}/${path.basename(file).replace(/[^\w.-]/g, "_")}`
+          await adb(target, "push", file, remote)
+          // Register the file so gallery and picker apps list it immediately.
+          await adbShell(
+            target,
+            "am",
+            "broadcast",
+            "-a",
+            "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+            "-d",
+            `file://${remote}`
+          ).catch(() => undefined)
+        }
+        await adbShell(
+          target,
+          "content",
+          "call",
+          "--uri",
+          "content://media",
+          "--method",
+          "scan_volume",
+          "--arg",
+          "external_primary"
+        ).catch(() => undefined)
+      }
+      return {
+        ok: true,
+        message: `Added ${files.length} file${files.length === 1 ? "" : "s"} to the library`,
+      }
+    },
+
+    async biometrics(target, args) {
+      const mode = args.mode
+      if (mode !== "enroll" && mode !== "unenroll" && mode !== "match" && mode !== "fail") {
+        fail("Unknown biometric action.")
+      }
+      if (target.kind === "ios-simulator") {
+        const notify = (...notifyArgs: string[]) =>
+          simctl("spawn", target.id, "notifyutil", ...notifyArgs)
+        if (mode === "enroll" || mode === "unenroll") {
+          await notify(
+            "-s",
+            "com.apple.BiometricKit.enrollmentChanged",
+            mode === "enroll" ? "1" : "0"
+          )
+          await notify("-p", "com.apple.BiometricKit.enrollmentChanged")
+          return {
+            ok: true,
+            message: mode === "enroll" ? "Face ID enrolled" : "Face ID unenrolled",
+          }
+        }
+        // Face ID ("pearl") and Touch ID ("fingerTouch") devices listen on different names.
+        const suffix = mode === "match" ? "match" : "nomatch"
+        await notify("-p", `com.apple.BiometricKit_Sim.pearl.${suffix}`)
+        await notify("-p", `com.apple.BiometricKit_Sim.fingerTouch.${suffix}`)
+        return {
+          ok: true,
+          message: mode === "match" ? "Sent a matching face" : "Sent a non-matching face",
+        }
+      }
+      if (target.kind === "android") {
+        if (!target.emulator) fail("Physical Android devices need a real fingerprint.")
+        if (mode === "enroll" || mode === "unenroll") {
+          fail(
+            "Enroll a fingerprint in the emulator's Settings › Security; then use Match and Fail here."
+          )
+        }
+        // Finger 1 is the one Settings enrolls first; an unenrolled id is a non-match.
+        await adb(target, "emu", "finger", "touch", mode === "match" ? "1" : "99")
+        return {
+          ok: true,
+          message: mode === "match" ? "Touched an enrolled finger" : "Touched an unknown finger",
+        }
+      }
+      if (mode === "enroll" || mode === "unenroll")
+        fail("Physical iPhones use the Face ID set up on the device.")
+      await devicectl(
+        "device",
+        "simulate",
+        "biometrics",
+        "--device",
+        target.id,
+        mode === "match" ? "--success" : "--failure"
+      )
+      return {
+        ok: true,
+        message: mode === "match" ? "Simulated a successful match" : "Simulated a failed match",
+      }
+    },
+
+    async reset(target, args) {
+      const kind = args.kind
+      if (target.kind === "ios-physical") fail("Physical iPhones cannot be reset from a computer.")
+      if (kind === "keychain") {
+        if (target.kind !== "ios-simulator")
+          fail("Android has no shared keychain; clear the app's data instead.")
+        await simctl("keychain", target.id, "reset")
+        return { ok: true, message: "Reset the simulator keychain (every app's saved logins)" }
+      }
+      if (kind !== "app-data") fail("Unknown reset.")
+      const appId = assertAppId(args.appId)
+      if (target.kind === "android") {
+        await adbShell(target, "pm", "clear", appId)
+        return { ok: true, message: `Cleared ${appId}'s data` }
+      }
+      await simctl("terminate", target.id, appId).catch(() => undefined)
+      const container = (await simctl("get_app_container", target.id, appId, "data")).trim()
+      // Never delete outside this simulator's own data containers.
+      const root = path.join(
+        os.homedir(),
+        "Library/Developer/CoreSimulator/Devices",
+        target.id,
+        "data/Containers/Data/Application"
+      )
+      if (!container.startsWith(`${root}/`) || container.includes("..")) {
+        fail("Could not locate the app's data container.")
+      }
+      for (const entry of await fs.promises.readdir(container)) {
+        // The bundle metadata plist identifies the container; everything else is app data.
+        if (entry === ".com.apple.mobile_container_manager.metadata.plist") continue
+        await fs.promises.rm(path.join(container, entry), { recursive: true, force: true })
+      }
+      // An empty container still needs the standard folders the app expects at launch.
+      for (const folder of [
+        "Documents",
+        "Library",
+        "Library/Caches",
+        "Library/Preferences",
+        "tmp",
+      ]) {
+        await fs.promises.mkdir(path.join(container, folder), { recursive: true })
+      }
+      return { ok: true, message: `Cleared ${appId}'s data. Relaunch it to start fresh.` }
+    },
+
+    async crashes(target, args) {
+      const appId = assertAppId(args.appId)
+      if (target.kind === "ios-physical") {
+        fail("Physical iPhone crash logs are in Xcode's Organizer or the device's Analytics data.")
+      }
+      if (target.kind === "android") {
+        const output = await adb(target, "logcat", "-b", "crash", "-d", "-v", "time")
+        const lines = output.split("\n")
+        const related = lines.filter((line) => line.includes(appId))
+        const file = path.join(os.tmpdir(), `reactotron-android-crashes-${Date.now()}.txt`)
+        await fs.promises.writeFile(file, output || "No crashes in the device's crash buffer.\n")
+        await shell.openPath(file)
+        return {
+          ok: true,
+          message: related.length
+            ? `Opened the crash buffer (${related.length} lines mention ${appId})`
+            : `Opened the crash buffer; no entries mention ${appId}`,
+        }
+      }
+      const directory = path.join(os.homedir(), "Library/Logs/DiagnosticReports")
+      const names = (await fs.promises.readdir(directory).catch(() => [] as string[])).filter(
+        (name) => name.endsWith(".ips")
+      )
+      const crashes: Array<{ path: string; title: string; time: number }> = []
+      for (const name of names) {
+        const file = path.join(directory, name)
+        try {
+          const handle = await fs.promises.open(file, "r")
+          const buffer = Buffer.alloc(4096)
+          const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+          await handle.close()
+          // .ips files start with a one-line JSON header naming the app and bundle.
+          const header = JSON.parse(buffer.toString("utf8", 0, bytesRead).split("\n")[0])
+          if (header.bundleID !== appId) continue
+          const time =
+            Date.parse(header.timestamp?.replace(/\.\d+ /, " ")) ||
+            (await fs.promises.stat(file)).mtimeMs
+          crashes.push({
+            path: file,
+            title: `${header.app_name ?? appId} ${header.bug_type === "309" ? "crash" : "report"}`,
+            time,
+          })
+        } catch {
+          // Not a readable .ips header; skip it.
+        }
+      }
+      crashes.sort((a, b) => b.time - a.time)
+      return {
+        ok: true,
+        crashes: crashes.slice(0, 10),
+        message: crashes.length ? undefined : `No crash reports for ${appId} on this Mac`,
+      }
+    },
+
+    async "open-crash"(_target, args) {
+      const file = typeof args.path === "string" ? args.path : ""
+      const directory = path.join(os.homedir(), "Library/Logs/DiagnosticReports")
+      if (!file.startsWith(`${directory}/`) || !file.endsWith(".ips") || file.includes("..")) {
+        fail("Unknown crash report.")
+      }
+      const error = await shell.openPath(file)
+      if (error) fail(error)
+      return { ok: true }
+    },
+
+    async "status-bar"(target, args) {
+      const clean = args.mode === "clean"
+      if (args.mode !== "clean" && args.mode !== "clear") fail("Unknown status bar action.")
+      if (target.kind === "ios-simulator") {
+        if (clean) {
+          await simctl(
+            "status_bar",
+            target.id,
+            "override",
+            "--time",
+            "9:41",
+            "--dataNetwork",
+            "wifi",
+            "--wifiMode",
+            "active",
+            "--wifiBars",
+            "3",
+            "--cellularMode",
+            "active",
+            "--cellularBars",
+            "4",
+            "--batteryState",
+            "charged",
+            "--batteryLevel",
+            "100"
+          )
+        } else await simctl("status_bar", target.id, "clear")
+      } else if (target.kind === "android") {
+        if (clean) {
+          await adbShell(target, "settings", "put", "global", "sysui_demo_allowed", "1")
+          const demo = (...extras: string[]) =>
+            adbShell(target, "am", "broadcast", "-a", "com.android.systemui.demo", ...extras)
+          await demo("-e", "command", "enter")
+          await demo("-e", "command", "clock", "-e", "hhmm", "0941")
+          await demo("-e", "command", "battery", "-e", "level", "100", "-e", "plugged", "false")
+          await demo("-e", "command", "network", "-e", "wifi", "show", "-e", "level", "4")
+          await demo(
+            "-e",
+            "command",
+            "network",
+            "-e",
+            "mobile",
+            "show",
+            "-e",
+            "level",
+            "4",
+            "-e",
+            "datatype",
+            "none"
+          )
+          await demo("-e", "command", "notifications", "-e", "visible", "false")
+        } else {
+          await adbShell(
+            target,
+            "am",
+            "broadcast",
+            "-a",
+            "com.android.systemui.demo",
+            "-e",
+            "command",
+            "exit"
+          )
+        }
+      } else if (clean) {
+        await devicectl(
+          "device",
+          "simulate",
+          "statusBar",
+          "preset",
+          "screenshot",
+          "--device",
+          target.id
+        )
+      } else await devicectl("device", "simulate", "statusBar", "clear", "--device", target.id)
+      return {
+        ok: true,
+        message: clean ? "Status bar set to 9:41, full battery and signal" : "Status bar restored",
+      }
+    },
+
+    async "memory-warning"(target, args) {
+      if (target.kind === "ios-simulator") {
+        await serveSimCli(["memory-warning", "-d", target.id])
+        return { ok: true, message: "Sent a memory warning" }
+      }
+      const appId = assertAppId(args.appId)
+      if (target.kind === "android") {
+        await adbShell(target, "am", "send-trim-memory", appId, "RUNNING_CRITICAL")
+      } else {
+        const pid = await physicalPid(target, appId)
+        await devicectl(
+          "device",
+          "process",
+          "sendMemoryWarning",
+          "--device",
+          target.id,
+          "--pid",
+          String(pid)
+        )
+      }
+      return { ok: true, message: `Sent a memory warning to ${appId}` }
+    },
+
+    async "ui-status"(target) {
+      if (target.kind === "ios-simulator") {
+        const ui = JSON.parse(
+          await serveSimCli(["ui", "status", "--json", "-d", target.id])
+        ) as Record<string, string>
+        return { ok: true, ui }
+      }
+      if (target.kind === "android") {
+        const fontScale =
+          Number((await adbShell(target, "settings", "get", "system", "font_scale")).trim()) || 1
+        const animator = (
+          await adbShell(target, "settings", "get", "global", "animator_duration_scale")
+        ).trim()
+        return {
+          ok: true,
+          ui: {
+            "text-size": String(fontScale),
+            "reduce-motion": animator === "0" || animator === "0.0" ? "on" : "off",
+          },
+        }
+      }
+      return { ok: true, ui: {} }
+    },
+
+    async ui(target, args) {
+      const option = String(args.option)
+      const value = String(args.value)
+      if (target.kind === "ios-simulator") {
+        const allowed = UI_OPTIONS[option]
+        if (!allowed || !allowed.includes(value)) fail("Unknown display option.")
+        await serveSimCli(["ui", option, value, "-d", target.id])
+        return { ok: true, message: `${option} → ${value}` }
+      }
+      if (target.kind === "android") {
+        if (option === "text-size") {
+          const scale = Number(value)
+          if (!ANDROID_FONT_SCALES.includes(scale)) fail("Unknown text size.")
+          await adbShell(target, "settings", "put", "system", "font_scale", String(scale))
+          return { ok: true, message: `Font scale ${scale}×` }
+        }
+        if (option === "reduce-motion" && (value === "on" || value === "off")) {
+          const scale = value === "on" ? "0" : "1"
+          for (const key of [
+            "animator_duration_scale",
+            "transition_animation_scale",
+            "window_animation_scale",
+          ]) {
+            await adbShell(target, "settings", "put", "global", key, scale)
+          }
+          return { ok: true, message: value === "on" ? "Animations off" : "Animations on" }
+        }
+        fail("That option is only available on iOS simulators.")
+      }
+      return fail("Display options cannot be changed on a physical iPhone from a computer.")
+    },
+
+    async clipboard(target, args) {
+      const text = typeof args.text === "string" ? args.text : ""
+      if (!text || text.length > 10_000) fail("Enter up to 10,000 characters.")
+      if (target.kind === "ios-simulator") {
+        // simctl pbcopy reports success but leaves an iOS 27 simulator's pasteboard
+        // empty, so type the text into the focused field instead.
+        await withTemporaryFile(text, ".txt", (file) =>
+          serveSimCli(["type", "--file", file, "-d", target.id])
+        )
+        return { ok: true, message: "Typed into the focused field" }
+      }
+      if (target.kind === "ios-physical") {
+        await run("xcrun", ["devicectl", "device", "pasteboard", "copy", "--device", target.id], {
+          input: text,
+          timeoutMs: 60_000,
+        })
+        return { ok: true, message: "Copied to the iPhone's clipboard; paste in the app" }
+      }
+      // adb has no clipboard command; type into the focused field instead.
+      // input text treats spaces as separators, so they are sent as %s.
+      await adbShell(target, "input", "text", text.replace(/ /g, "%s"))
+      return { ok: true, message: "Typed into the focused field" }
     },
   }
 

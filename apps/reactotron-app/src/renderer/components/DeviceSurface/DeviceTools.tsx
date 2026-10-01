@@ -14,7 +14,44 @@ export type DeviceToolTarget =
   | { kind: "ios-physical"; id: string }
   | { kind: "android"; id: string; emulator: boolean }
 
-type ToolResult = { ok: boolean; message?: string; apps?: Array<{ id: string; name?: string }> }
+type ToolResult = {
+  ok: boolean
+  message?: string
+  apps?: Array<{ id: string; name?: string }>
+  crashes?: Array<{ path: string; title: string; time: number }>
+  ui?: Record<string, string>
+}
+
+const TEXT_SIZES = [
+  "extra-small",
+  "small",
+  "medium",
+  "large",
+  "extra-large",
+  "extra-extra-large",
+  "extra-extra-extra-large",
+  "accessibility-medium",
+  "accessibility-large",
+  "accessibility-extra-large",
+  "accessibility-extra-extra-large",
+  "accessibility-extra-extra-extra-large",
+]
+const ANDROID_FONT_SCALES = ["0.85", "1", "1.15", "1.3", "1.5", "1.8", "2"]
+const IOS_TOGGLES: Array<[string, string]> = [
+  ["reduce-motion", "Reduce Motion"],
+  ["increase-contrast", "Increase Contrast"],
+  ["reduce-transparency", "Reduce Transparency"],
+  ["show-borders", "Button Shapes"],
+  ["voiceover", "VoiceOver"],
+]
+const ANDROID_TOGGLES: Array<[string, string]> = [["reduce-motion", "Remove animations"]]
+const COLOR_FILTERS: Array<[string, string]> = [
+  ["none", "None"],
+  ["grayscale", "Grayscale"],
+  ["red-green", "Red/Green (protanopia)"],
+  ["green-red", "Green/Red (deuteranopia)"],
+  ["blue-yellow", "Blue/Yellow (tritanopia)"],
+]
 
 const IOS_PERMISSIONS = [
   "notifications",
@@ -177,6 +214,57 @@ const Note = styled.p`
   line-height: 16px;
 `
 
+const Toggle = styled.button<{ $on: boolean }>`
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: 0 0 36px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: ${(props) => (props.$on ? "#63b76c" : props.theme.borderSubtle)};
+  cursor: pointer;
+  transition: background 120ms ease;
+
+  &::after {
+    position: absolute;
+    top: 2px;
+    left: ${(props) => (props.$on ? "18px" : "2px")};
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    content: "";
+    transition: left 120ms ease;
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${(props) => props.theme.highlight};
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+`
+
+const CrashLink = styled.button`
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: ${(props) => props.theme.highlight};
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`
+
 function appStorageKey(target: DeviceToolTarget) {
   return `reactotron.deviceTools.app.${target.kind}.${target.id}`
 }
@@ -224,6 +312,9 @@ function DeviceTools({
   const [latitude, setLatitude] = useState("")
   const [longitude, setLongitude] = useState("")
   const [payload, setPayload] = useState(DEFAULT_PUSH)
+  const [clipboard, setClipboard] = useState("")
+  const [crashes, setCrashes] = useState<ToolResult["crashes"] | null>(null)
+  const [ui, setUi] = useState<Record<string, string>>({})
 
   const isIOSSimulator = target.kind === "ios-simulator"
   const isAndroid = target.kind === "android"
@@ -278,6 +369,37 @@ function DeviceTools({
   useEffect(() => {
     loadApps().catch(() => undefined)
   }, [loadApps])
+
+  const loadUi = useCallback(async () => {
+    if (target.kind === "ios-physical") return
+    const result = (await ipcRenderer.invoke("device-tool", target, "ui-status")) as ToolResult
+    if (result.ok && result.ui) {
+      const next = { ...result.ui }
+      // Android reports its font scale as a number; match the picker's values.
+      if (target.kind === "android" && next["text-size"]) {
+        const scale = Number(next["text-size"])
+        next["text-size"] =
+          ANDROID_FONT_SCALES.find((value) => Math.abs(Number(value) - scale) < 0.01) ??
+          String(scale)
+      }
+      setUi(next)
+    }
+  }, [target])
+
+  useEffect(() => {
+    loadUi().catch(() => undefined)
+  }, [loadUi])
+
+  const setDisplay = (option: string, value: string) => {
+    setUi((current) => ({ ...current, [option]: value }))
+    runTool("ui", { option, value })
+      .then((result) => {
+        if (!result?.ok) loadUi().catch(() => undefined)
+      })
+      .catch(() => undefined)
+  }
+
+  useEffect(() => setCrashes(null), [appId])
 
   const chooseApp = (next: string) => {
     setAppId(next)
@@ -490,6 +612,268 @@ function DeviceTools({
               : "Push to a physical iPhone goes through Apple's push service, not the computer."}
           </Note>
         )}
+      </Section>
+
+      <Section>
+        <strong>Photos</strong>
+        {isPhysicalIOS ? (
+          <Note>
+            Adding photos to a physical iPhone&apos;s library is not possible from a computer.
+          </Note>
+        ) : (
+          <>
+            <Row>
+              <Button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => runTool("add-media").catch(() => undefined)}
+              >
+                Add photos or videos…
+              </Button>
+            </Row>
+            <Note>
+              Adds files to the device&apos;s library so the app&apos;s picker can choose them.
+            </Note>
+          </>
+        )}
+      </Section>
+
+      <Section>
+        <strong>{isIOSSimulator ? "Face ID" : "Biometrics"}</strong>
+        {isAndroid && !target.emulator ? (
+          <Note>Physical Android devices need a real fingerprint.</Note>
+        ) : (
+          <Row>
+            {isIOSSimulator && (
+              <>
+                <Button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => runTool("biometrics", { mode: "enroll" }).catch(() => undefined)}
+                >
+                  Enroll
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => runTool("biometrics", { mode: "unenroll" }).catch(() => undefined)}
+                >
+                  Unenroll
+                </Button>
+              </>
+            )}
+            <Button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => runTool("biometrics", { mode: "match" }).catch(() => undefined)}
+            >
+              Match
+            </Button>
+            <Button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => runTool("biometrics", { mode: "fail" }).catch(() => undefined)}
+            >
+              Fail
+            </Button>
+          </Row>
+        )}
+        {isAndroid && target.emulator && (
+          <Note>Enroll a fingerprint in the emulator&apos;s Settings first.</Note>
+        )}
+      </Section>
+
+      <Section>
+        <strong>Reset</strong>
+        {isPhysicalIOS ? (
+          <Note>Physical iPhones cannot be reset from a computer.</Note>
+        ) : (
+          <Row>
+            <Button
+              type="button"
+              disabled={disabled("reset")}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Clear all of ${appId}'s data on this device? It will start like a fresh install.`
+                  )
+                ) {
+                  runTool("reset", { kind: "app-data", appId }).catch(() => undefined)
+                }
+              }}
+            >
+              Clear app data
+            </Button>
+            {isIOSSimulator && (
+              <Button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Reset this simulator's keychain? Every app on it loses its saved logins and tokens."
+                    )
+                  ) {
+                    runTool("reset", { kind: "keychain" }).catch(() => undefined)
+                  }
+                }}
+              >
+                Reset keychain (all apps)
+              </Button>
+            )}
+          </Row>
+        )}
+      </Section>
+
+      <Section>
+        <strong>Diagnostics</strong>
+        <Row>
+          <Button
+            type="button"
+            disabled={busy !== null || (!isIOSSimulator && !appId)}
+            onClick={() => runTool("memory-warning", { appId }).catch(() => undefined)}
+          >
+            Memory warning
+          </Button>
+          {!isPhysicalIOS && (
+            <Button
+              type="button"
+              disabled={disabled("crashes")}
+              onClick={() =>
+                runTool("crashes", { appId })
+                  .then((result) => setCrashes(result?.crashes ?? null))
+                  .catch(() => undefined)
+              }
+            >
+              {isAndroid ? "Open crash log" : "Crash reports"}
+            </Button>
+          )}
+        </Row>
+        {isIOSSimulator &&
+          crashes?.map((crash) => (
+            <CrashLink
+              key={crash.path}
+              type="button"
+              onClick={() => runTool("open-crash", { path: crash.path }).catch(() => undefined)}
+            >
+              {new Date(crash.time).toLocaleString()} · {crash.title}
+            </CrashLink>
+          ))}
+        {isPhysicalIOS && <Note>Physical iPhone crash logs are in Xcode&apos;s Organizer.</Note>}
+      </Section>
+
+      <Section>
+        <strong>Status bar</strong>
+        <Row>
+          <Button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => runTool("status-bar", { mode: "clean" }).catch(() => undefined)}
+          >
+            Clean (9:41)
+          </Button>
+          <Button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => runTool("status-bar", { mode: "clear" }).catch(() => undefined)}
+          >
+            Restore
+          </Button>
+        </Row>
+      </Section>
+
+      <Section>
+        <strong>Display</strong>
+        {isPhysicalIOS ? (
+          <Note>Display settings cannot be changed on a physical iPhone from a computer.</Note>
+        ) : (
+          <>
+            <Row>
+              <Label>Text size</Label>
+              <Select
+                aria-label="Text size"
+                value={ui["text-size"] ?? ""}
+                disabled={busy !== null}
+                onChange={(event) => setDisplay("text-size", event.target.value)}
+              >
+                {!ui["text-size"] && <option value="">…</option>}
+                {(isAndroid ? ANDROID_FONT_SCALES : TEXT_SIZES).map((size) => (
+                  <option key={size} value={size}>
+                    {isAndroid ? `${size}×` : size.replace(/-/g, " ")}
+                  </option>
+                ))}
+              </Select>
+            </Row>
+            {(isAndroid ? ANDROID_TOGGLES : IOS_TOGGLES).map(([option, label]) => (
+              <Row key={option}>
+                <Label>{label}</Label>
+                <Toggle
+                  type="button"
+                  role="switch"
+                  aria-checked={ui[option] === "on"}
+                  aria-label={label}
+                  $on={ui[option] === "on"}
+                  disabled={busy !== null}
+                  onClick={() => setDisplay(option, ui[option] === "on" ? "off" : "on")}
+                />
+              </Row>
+            ))}
+            {isIOSSimulator && (
+              <>
+                <Row>
+                  <Label>Liquid Glass</Label>
+                  <Select
+                    aria-label="Liquid Glass"
+                    value={ui["liquid-glass"] ?? "clear"}
+                    disabled={busy !== null}
+                    onChange={(event) => setDisplay("liquid-glass", event.target.value)}
+                  >
+                    <option value="clear">Clear</option>
+                    <option value="tinted">Tinted</option>
+                  </Select>
+                </Row>
+                <Row>
+                  <Label>Color filter</Label>
+                  <Select
+                    aria-label="Color filter"
+                    value={ui["color-filter"] ?? "none"}
+                    disabled={busy !== null}
+                    onChange={(event) => setDisplay("color-filter", event.target.value)}
+                  >
+                    {COLOR_FILTERS.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </Select>
+                </Row>
+              </>
+            )}
+          </>
+        )}
+      </Section>
+
+      <Section>
+        <strong>{isPhysicalIOS ? "Clipboard" : "Type text"}</strong>
+        <Row
+          as="form"
+          onSubmit={(event: React.FormEvent) => {
+            event.preventDefault()
+            runTool("clipboard", { text: clipboard }).catch(() => undefined)
+          }}
+        >
+          <Input
+            aria-label="Text to send to the device"
+            placeholder={
+              isPhysicalIOS ? "Text to copy to the iPhone" : "Text to type into the focused field"
+            }
+            value={clipboard}
+            onChange={(event) => setClipboard(event.target.value)}
+          />
+          <Button type="submit" disabled={busy !== null || !clipboard}>
+            {isPhysicalIOS ? "Copy" : "Type"}
+          </Button>
+        </Row>
       </Section>
     </>
   )

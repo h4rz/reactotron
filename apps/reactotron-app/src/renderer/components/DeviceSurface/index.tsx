@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ipcRenderer } from "electron"
 import { MdAdd, MdClose, MdPhoneIphone, MdRefresh } from "react-icons/md"
+import { SiAndroid, SiApple } from "react-icons/si"
 import {
   FiArrowLeft,
   FiBox,
@@ -251,9 +252,10 @@ const DeviceTabs = styled.div`
 
 const DeviceTab = styled.div<{ $active: boolean }>`
   display: flex;
+  width: 156px;
   height: 30px;
-  max-width: 200px;
-  flex: 0 1 auto;
+  /* Fixed so the strip does not reflow with device names; long names are cut off. */
+  flex: 0 0 156px;
   align-items: center;
   box-sizing: border-box;
   border: 1px solid ${(props) => (props.$active ? props.theme.borderSubtle : "transparent")};
@@ -269,6 +271,7 @@ const DeviceTab = styled.div<{ $active: boolean }>`
 const DeviceTabButton = styled.button`
   display: flex;
   min-width: 0;
+  flex: 1;
   height: 100%;
   align-items: center;
   gap: 6px;
@@ -302,10 +305,23 @@ const DeviceTabClose = styled(IconButton)`
   border-radius: 6px;
 `
 
+const PlatformMark = styled.span`
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  place-items: center;
+`
+
+// Google's brand colour for the Android robot.
+const ANDROID_GREEN = "#3ddc84"
+
+/** Shown after the name only when a device needs attention: connecting or recording. */
 const StatusDot = styled.span<{ $tone: "ok" | "pending" | "recording" }>`
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  margin-left: auto;
   border-radius: 50%;
   background: ${(props) =>
     props.$tone === "recording"
@@ -2711,23 +2727,28 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                       title={`${surface.name} · ${surface.runtime}`}
                       onClick={() => selectActiveDevice(`ios:${surface.udid}`)}
                     >
-                      <StatusDot
-                        $tone={
-                          surface.recording
-                            ? "recording"
-                            : active && !isControlConnected
-                              ? "pending"
-                              : "ok"
-                        }
-                        aria-label={
-                          surface.recording
-                            ? "Recording"
-                            : active && !isControlConnected
-                              ? "Connecting"
-                              : "Connected"
-                        }
-                      />
+                      <PlatformMark>
+                        <SiApple size={14} aria-hidden />
+                      </PlatformMark>
                       <span>{surface.name}</span>
+                      {(surface.recording || (active && !isControlConnected)) && (
+                        <StatusDot
+                          $tone={
+                            surface.recording
+                              ? "recording"
+                              : active && !isControlConnected
+                                ? "pending"
+                                : "ok"
+                          }
+                          aria-label={
+                            surface.recording
+                              ? "Recording"
+                              : active && !isControlConnected
+                                ? "Connecting"
+                                : "Connected"
+                          }
+                        />
+                      )}
                     </DeviceTabButton>
                     <DeviceTabClose
                       type="button"
@@ -2749,7 +2770,9 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     title={`${physicalIOSSurface.name} · iOS ${physicalIOSSurface.productVersion} · USB, experimental`}
                     onClick={() => selectActiveDevice(`physical-ios:${physicalIOSSurface.udid}`)}
                   >
-                    <StatusDot $tone="ok" aria-label="Connected over USB" />
+                    <PlatformMark>
+                      <SiApple size={14} aria-hidden />
+                    </PlatformMark>
                     <span>{physicalIOSSurface.name}</span>
                   </DeviceTabButton>
                   <DeviceTabClose
@@ -2773,11 +2796,11 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     } · ${activeAndroidDevice.id}`}
                     onClick={() => selectActiveDevice(`android:${activeAndroidDevice.id}`)}
                   >
-                    <StatusDot
-                      $tone={isAndroidRecording ? "recording" : "ok"}
-                      aria-label={isAndroidRecording ? "Recording" : "Connected"}
-                    />
+                    <PlatformMark>
+                      <SiAndroid size={15} color={ANDROID_GREEN} aria-hidden />
+                    </PlatformMark>
                     <span>{activeAndroidDevice.model}</span>
+                    {isAndroidRecording && <StatusDot $tone="recording" aria-label="Recording" />}
                   </DeviceTabButton>
                   <DeviceTabClose
                     type="button"

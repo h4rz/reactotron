@@ -32,7 +32,9 @@ function buildFileMenu() {
       },
       {
         label: "Hide Others",
-        accelerator: "Command+Shift+H",
+        // The macOS standard. Shift+Command+H is the device hub's Home shortcut,
+        // matching Simulator.app, and a menu accelerator would swallow it.
+        accelerator: "Alt+Command+H",
         selector: "hideOtherApplications:",
       },
       { label: "Show All", selector: "unhideAllApplications:" },
@@ -114,7 +116,9 @@ function buildViewMenu(window: Electron.BrowserWindow, isDevelopment: boolean) {
       { type: "separator" },
       {
         label: isDarwin ? "Reload" : "&Reload",
-        accelerator: isDarwin ? "Command+R" : "Ctrl+R",
+        // Command+R toggles device recording; reloading the window there would
+        // drop every open device and strand a running recording.
+        accelerator: isDarwin ? "Alt+Command+R" : "Ctrl+Alt+R",
         click: () => {
           window.webContents.reload()
         },

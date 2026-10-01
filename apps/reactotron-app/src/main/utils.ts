@@ -7,6 +7,7 @@ import { isIOSSimulatorSupported } from "../platform"
 import { getAdbPath } from "./adb-path"
 import { startAndroidScrcpyStream, type AndroidScrcpyStream } from "./android-scrcpy"
 import { registerDeviceModelHandlers } from "./device-models"
+import { registerDeviceToolHandlers, stopDeviceToolProcesses } from "./device-tools"
 import {
   closePhysicalIOSDevice,
   listPhysicalIOSDevices,
@@ -980,6 +981,7 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
   })
 
   registerDeviceModelHandlers()
+  registerDeviceToolHandlers((args) => getServeSimRunner(args, true))
 
   ipcMain.handle("list-android-devices", async () => {
     try {
@@ -1655,6 +1657,7 @@ function waitForRecordingStart(
 
 export const stopIOSSimulatorSurfaces = () => {
   stopPhysicalIOSPreviews()
+  stopDeviceToolProcesses()
   // "before-quit" does not await, so there is no opportunity to check whether
   // a serve-sim process honoured SIGTERM before the app goes away. Send
   // SIGKILL outright rather than risk leaving one running after quit.

@@ -42,6 +42,7 @@ import {
   type DeviceFrameLayout,
 } from "./layout"
 import { AvccStreamParser, avcCodecString } from "./avccStream"
+import DeviceTools, { type DeviceToolTarget } from "./DeviceTools"
 import DeviceViewport, { useFrameSignal, type SourceLimit } from "./DeviceViewport"
 import { createMjpegFrameParser } from "./mjpegFrameParser"
 import { resolveDeviceModelId } from "./scene/modelScene"
@@ -2656,6 +2657,25 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     ).catch(() => undefined)
   }
 
+  // The device the Tools drawer acts on: whichever tab is selected. Keyed on ids,
+  // not device objects, which change on every screen-config update.
+  const toolSimulatorUdid = !isChoosing ? activeSurface?.udid : undefined
+  const toolPhysicalUdid = !isChoosing && !activeSurface ? activePhysicalIOS?.udid : undefined
+  const toolAndroid =
+    !isChoosing && isAndroidSurfaceActive && activeAndroidDevice ? activeAndroidDevice : null
+  const toolAndroidId = toolAndroid?.id
+  const toolAndroidEmulator = toolAndroid?.type === "emulator"
+  const toolTarget = useMemo<DeviceToolTarget | null>(() => {
+    if (toolSimulatorUdid) return { kind: "ios-simulator", id: toolSimulatorUdid }
+    if (toolPhysicalUdid) return { kind: "ios-physical", id: toolPhysicalUdid }
+    if (toolAndroidId) return { kind: "android", id: toolAndroidId, emulator: toolAndroidEmulator }
+    return null
+  }, [toolAndroidEmulator, toolAndroidId, toolPhysicalUdid, toolSimulatorUdid])
+  const onToolResult = useCallback((message: string, error: boolean) => {
+    setStatus(message)
+    setIsError(error)
+  }, [])
+
   const viewControls = (
     <>
       <RailButton
@@ -3017,6 +3037,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                         <FiX size={18} />
                       </RailButton>
                     </ToolsHeader>
+                    {toolTarget && <DeviceTools target={toolTarget} onResult={onToolResult} />}
                     <ToolsSection>
                       <strong>Device</strong>
                       <ToolsAction
@@ -3095,7 +3116,36 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   >
                     <FiHome size={18} />
                   </RailButton>
+                  <RailDivider />
+                  <RailButton
+                    ref={toolsTriggerRef}
+                    type="button"
+                    aria-label="More iPhone tools"
+                    title="More iPhone tools"
+                    aria-expanded={toolsOpen}
+                    aria-controls="physical-ios-tools"
+                    $active={toolsOpen}
+                    onClick={() => setToolsOpen((current) => !current)}
+                  >
+                    <FiMoreHorizontal size={19} />
+                  </RailButton>
                 </ControlsRail>
+                {toolsOpen && (
+                  <ToolsDrawer id="physical-ios-tools" aria-label="iPhone tools">
+                    <ToolsHeader>
+                      <span>iPhone tools</span>
+                      <RailButton
+                        ref={toolsCloseRef}
+                        type="button"
+                        aria-label="Close iPhone tools"
+                        onClick={() => setToolsOpen(false)}
+                      >
+                        <FiX size={18} />
+                      </RailButton>
+                    </ToolsHeader>
+                    {toolTarget && <DeviceTools target={toolTarget} onResult={onToolResult} />}
+                  </ToolsDrawer>
+                )}
               </PreviewContainer>
               {status && <Status $error={isError}>{status}</Status>}
             </>
@@ -3261,6 +3311,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                         <FiX size={18} />
                       </RailButton>
                     </ToolsHeader>
+                    {toolTarget && <DeviceTools target={toolTarget} onResult={onToolResult} />}
                     <ToolsSection>
                       <strong>Device</strong>
                       <ToolsAction

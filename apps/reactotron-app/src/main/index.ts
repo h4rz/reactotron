@@ -17,7 +17,7 @@ import windowStateKeeper from "electron-window-state"
 
 import { isIOSSimulatorSupported } from "../platform"
 import createMenu from "./menu"
-import { killOrphanedServeSimProcesses } from "./serve-sim-cleanup"
+import { killOrphanedServeSimProcesses, stopOrphanedSimulatorRecordings } from "./serve-sim-cleanup"
 import {
   setupAndroidDeviceIPCCommands,
   setupSimulatorIPCCommands,
@@ -252,7 +252,10 @@ if (!app.requestSingleInstanceLock()) {
   app.on("ready", () => {
     // Runs before any surface starts so a stranded server from a previous run
     // cannot keep holding the port this one is about to ask for.
-    if (isMacOS) killOrphanedServeSimProcesses()
+    if (isMacOS) {
+      killOrphanedServeSimProcesses()
+      stopOrphanedSimulatorRecordings()
+    }
 
     mainWindow = createMainWindow()
 

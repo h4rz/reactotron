@@ -63,3 +63,42 @@ export function killOrphanedServeSimProcesses(): void {
     }
   }
 }
+
+// Matches the recorders toggle-ios-simulator-recording starts: simctl writing into
+// Reactotron's own temp folder. Recordings made by other tools are never touched.
+const RECORDING_COMMAND = /simctl io \S+ recordVideo .*\/reactotron\/simulator-recordings\//
+
+/**
+ * Finish simulator recordings left behind by a previous Reactotron run.
+ *
+ * Quitting normally stops them, but a crash or kill leaves `simctl recordVideo`
+ * running under launchd. The simulator then refuses every new recording with
+ * "Host recording is already in progress", so the record button cannot work
+ * until the orphan is gone. SIGINT lets simctl write a playable file first.
+ */
+export function stopOrphanedSimulatorRecordings(): void {
+  let output: string
+  try {
+    output = childProcess.execFileSync("ps", ["-eo", "pid=,ppid=,args="], {
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+    })
+  } catch (error) {
+    console.log("[Reactotron Desktop] Could not scan for stale simulator recordings.", error)
+    return
+  }
+
+  for (const line of output.split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
+    if (!match || !RECORDING_COMMAND.test(match[3])) continue
+    const pid = Number(match[1])
+    // Anything still owned by a live parent belongs to another Reactotron.
+    if (Number(match[2]) !== 1 || pid === process.pid) continue
+    try {
+      process.kill(pid, "SIGINT")
+      console.log(`[Reactotron Desktop] Stopped stale simulator recording ${pid}.`)
+    } catch {
+      // Already gone, or owned by another user. Neither is actionable.
+    }
+  }
+}

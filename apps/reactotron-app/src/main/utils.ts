@@ -1414,6 +1414,19 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
           simulatorRecordings.delete(udid)
         }
       })
+      // simctl reports "Recording started" on stderr once the encoder is running.
+      // Until then it may still refuse, e.g. "Host recording is already in
+      // progress" when another recorder holds the simulator. Reporting success
+      // before that left the button showing a recording that did not exist.
+      const started = await waitForRecordingStart(recordingProcess)
+      if ("message" in started) {
+        if (simulatorRecordings.get(udid)?.process === recordingProcess) {
+          simulatorRecordings.delete(udid)
+        }
+        if (recordingProcess.exitCode === null) recordingProcess.kill("SIGINT")
+        await fs.promises.rm(filePath, { force: true }).catch(() => undefined)
+        return { ok: false, message: started.message }
+      }
       return { ok: true, recording: true }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
@@ -1594,6 +1607,46 @@ export const setupSimulatorIPCCommands = (mainWindow?: BrowserWindow) => {
       console.log("[Reactotron Desktop] Failed to reload via Metro.", message)
       return { ok: false, message }
     }
+  })
+}
+
+const RECORDING_START_TIMEOUT_MS = 8000
+
+function waitForRecordingStart(
+  recordingProcess: childProcess.ChildProcess
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return new Promise((resolve) => {
+    let stderr = ""
+    let settled = false
+    const finish = (result: { ok: true } | { ok: false; message: string }) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      recordingProcess.stderr?.off("data", onData)
+      recordingProcess.off("close", onClose)
+      recordingProcess.off("error", onError)
+      resolve(result)
+    }
+    const onData = (chunk: Buffer) => {
+      stderr += chunk.toString()
+      if (/Recording started/i.test(stderr)) finish({ ok: true })
+    }
+    const lastError = () =>
+      stderr
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("Note:"))
+        .pop()
+    const onClose = () =>
+      finish({ ok: false, message: lastError() || "The simulator recording did not start." })
+    const onError = (error: Error) => finish({ ok: false, message: error.message })
+    const timer = setTimeout(
+      () => finish({ ok: false, message: "The simulator recording did not start in time." }),
+      RECORDING_START_TIMEOUT_MS
+    )
+    recordingProcess.stderr?.on("data", onData)
+    recordingProcess.once("close", onClose)
+    recordingProcess.once("error", onError)
   })
 }
 

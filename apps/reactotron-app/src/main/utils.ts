@@ -302,8 +302,17 @@ async function runAndroidDeviceCommand(
   ])
 }
 
-function getServeSimCliPath(duo: boolean): string {
-  const cliPath = duo
+function hasExpoServeSim(): boolean {
+  try {
+    getServeSimCliPath(true)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function getServeSimCliPath(expo: boolean): string {
+  const cliPath = expo
     ? path.join("node_modules", "@expo", "serve-sim", "dist", "serve-sim.js")
     : path.join("node_modules", "serve-sim", "dist", "serve-sim.js")
   const candidates = new Set([
@@ -325,7 +334,7 @@ function getServeSimCliPath(duo: boolean): string {
 
   if (!pathToCli) {
     throw new Error(
-      duo
+      expo
         ? "iPhone Duo support is unavailable in this build. Reinstall Reactotron and try again."
         : "serve-sim is not installed. Reinstall Reactotron and try again."
     )
@@ -348,13 +357,13 @@ function getServeSimCliPath(duo: boolean): string {
  */
 function getServeSimRunner(
   args: string[],
-  duo = false
+  expo = false
 ): {
   command: string
   args: string[]
   env: NodeJS.ProcessEnv
 } {
-  const cliPath = getServeSimCliPath(duo)
+  const cliPath = getServeSimCliPath(expo)
   const overridePath = process.env.REACTOTRON_NODE_PATH
 
   if (overridePath) {
@@ -610,9 +619,14 @@ async function spawnServeSim(
   const previewUrl = `http://127.0.0.1:${port}?device=${udid}&session=${Date.now()}`
   const simulator = (await getAvailableIOSSimulators()).find((item) => item.udid === udid)
   if (!simulator) throw new Error("That iOS simulator is no longer available.")
+  // Expo's serve-sim, which T3 Code runs, holds a simulator playing video at a
+  // few percent of a core; the original package's helper took up to a full core
+  // on the same screen. Its native module is arm64-only, so Intel Macs keep the
+  // original.
+  const isDuo = /iPhone Duo/i.test(simulator.name)
   const runner = getServeSimRunner(
     ["--port", String(port), "--codec", "auto", udid],
-    /iPhone Duo/i.test(simulator.name) && process.arch === "arm64"
+    process.arch === "arm64" && (isDuo || hasExpoServeSim())
   )
   const serveSimProcess = childProcess.spawn(runner.command, runner.args, {
     shell: false,

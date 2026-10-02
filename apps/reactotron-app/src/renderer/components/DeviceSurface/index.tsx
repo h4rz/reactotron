@@ -843,7 +843,9 @@ function drawLimited(
   }
   const context = canvas.getContext("2d")
   if (!context) return
-  context.imageSmoothingQuality = "high"
+  // Mipmaps do the quality filtering in 3D; "high" here was a multi-pass resample
+  // on every frame for no visible gain.
+  context.imageSmoothingQuality = "low"
   context.drawImage(source, 0, 0, targetWidth, targetHeight)
 }
 
@@ -1320,7 +1322,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const [isResizing, setIsResizing] = useState(false)
   const [panelWidth, setPanelWidth] = useState(400)
   const [prefers3D, setPrefers3D] = useState(
-    () => window.localStorage.getItem(DEVICE_3D_STORAGE_KEY) !== "false"
+    // The flat frame is the default; 3D costs noticeably more GPU on busy streams.
+    () => window.localStorage.getItem(DEVICE_3D_STORAGE_KEY) === "true"
   )
   const [webglUnavailable, setWebglUnavailable] = useState(false)
   const render3D = prefers3D && !webglUnavailable

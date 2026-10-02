@@ -29,7 +29,7 @@ import {
 import { IOS_PHONE_SHAPE, type DeviceShapeProfile } from "./shapeProfile"
 
 /** The decoded picture. The caller owns it and the stream that fills it. */
-export type FrameSource = HTMLCanvasElement | HTMLImageElement
+export type FrameSource = HTMLCanvasElement | HTMLImageElement | HTMLVideoElement
 
 /** Hinge state for an iPhone Duo; null renders a single-slab phone or tablet. */
 export type DuoState = { angle: number; coverActive: boolean }
@@ -57,9 +57,13 @@ const DUO_TURN_MS = 650
 const MIN_FRAME_INTERVAL_MS = 1000 / 20
 
 function sourceSize(source: FrameSource) {
-  return source instanceof HTMLImageElement
-    ? { width: source.naturalWidth, height: source.naturalHeight }
-    : { width: source.width, height: source.height }
+  if (source instanceof HTMLImageElement) {
+    return { width: source.naturalWidth, height: source.naturalHeight }
+  }
+  if (source instanceof HTMLVideoElement) {
+    return { width: source.videoWidth, height: source.videoHeight }
+  }
+  return { width: source.width, height: source.height }
 }
 
 /** Supersample on standard-density displays; the browser's downscale keeps text crisp. */

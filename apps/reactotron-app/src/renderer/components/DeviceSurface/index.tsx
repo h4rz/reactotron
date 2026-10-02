@@ -85,6 +85,8 @@ type Surface = Simulator & {
   previewUrl: string
   streamUrl: string
   wsUrl: string
+  /** How serve-sim sends the picture; "webrtc" plays in a <video>. */
+  transport?: "http" | "webrtc"
   orientation: "portrait" | "landscape_left" | "portrait_upside_down" | "landscape_right"
   recording?: boolean
   screenSize?: { width: number; height: number }
@@ -473,6 +475,21 @@ const Preview = styled.canvas<{
 `
 
 const FallbackPreview = styled.img<{
+  $rotation: -90 | 0 | 90
+  $screenWidth: number
+  $screenHeight: number
+}>`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: ${(props) => (props.$rotation === 0 ? "100%" : `${props.$screenHeight}px`)};
+  height: ${(props) => (props.$rotation === 0 ? "100%" : `${props.$screenWidth}px`)};
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(${(props) => props.$rotation}deg);
+  user-select: none;
+`
+
+const VideoPreview = styled.video<{
   $rotation: -90 | 0 | 90
   $screenWidth: number
   $screenHeight: number
@@ -1152,8 +1169,174 @@ function useIOSAvccStream(
   return { canvasRef, isStreaming }
 }
 
+/**
+ * Advertise H.264 level 5.2 in the offer serve-sim answers.
+ *
+ * Chromium offers level 3.1, which caps a frame at 3600 macroblocks, so
+ * serve-sim scales a 1206x2622 simulator down to 640x1392: softer than the
+ * panel draws it on a Retina display. Chromium decodes higher levels anyway and
+ * its offer sets level-asymmetry-allowed, so only the copy sent to serve-sim is
+ * rewritten; the local description stays as Chromium generated it.
+ */
+function raiseH264Level(sdp: string) {
+  return sdp.replace(/(profile-level-id=[0-9a-f]{4})[0-9a-f]{2}/gi, "$134")
+}
+
+/**
+ * Play a simulator over WebRTC.
+ *
+ * The AVCC path decodes and paints every frame from renderer JavaScript, on the
+ * same thread that runs the Reactotron server and timeline. A screen playing
+ * video kept that thread busy enough to stall the whole app. Here Chromium's
+ * media pipeline receives, decodes and composites the stream itself, so the
+ * renderer only hears about frames when the 3D view needs them.
+ *
+ * Signalling is a single HTTP exchange: post a complete offer (ICE gathered,
+ * since serve-sim does not trickle) and apply the answer it returns.
+ */
+function useIOSWebRtcStream(
+  streamUrl: string | undefined,
+  enabled: boolean,
+  frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>
+) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isStreaming, setIsStreaming] = useState(false)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!streamUrl || !enabled || !video) {
+      setIsStreaming(false)
+      return undefined
+    }
+
+    const baseUrl = streamUrl.replace(/\/stream\.mjpeg(?:\?.*)?$/, "")
+    let disposed = false
+    let attempts = 0
+    let retryTimer: number | undefined
+    let frameCallback: number | undefined
+    let peer: RTCPeerConnection | null = null
+    let sessionId: string | null = null
+    const controller = new AbortController()
+
+    const onFrame = () => {
+      if (disposed) return
+      frameListener.current?.(streamUrl)
+      frameCallback = video.requestVideoFrameCallback(onFrame)
+    }
+
+    const closeSession = () => {
+      if (frameCallback !== undefined) video.cancelVideoFrameCallback(frameCallback)
+      frameCallback = undefined
+      peer?.close()
+      peer = null
+      video.srcObject = null
+      if (sessionId) {
+        // keepalive lets the close reach serve-sim even while the panel unmounts.
+        fetch(`${baseUrl}/webrtc/close`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+          keepalive: true,
+        }).catch(() => undefined)
+      }
+      sessionId = null
+    }
+
+    const retry = () => {
+      if (disposed) return
+      closeSession()
+      setIsStreaming(false)
+      if (attempts >= PREVIEW_RETRY_LIMIT) return
+      const delay = PREVIEW_RETRY_DELAY * Math.pow(2, attempts)
+      attempts += 1
+      retryTimer = window.setTimeout(() => {
+        connect().catch(retry)
+      }, delay)
+    }
+
+    const connect = async () => {
+      const connection = new RTCPeerConnection({ iceServers: [] })
+      peer = connection
+      sessionId = crypto.randomUUID()
+      const transceiver = connection.addTransceiver("video", { direction: "recvonly" })
+      const codecs = RTCRtpReceiver.getCapabilities("video")?.codecs ?? []
+      // serve-sim encodes H.264 by default; offering it first avoids a transcode.
+      transceiver.setCodecPreferences([
+        ...codecs.filter((codec) => /h264/i.test(codec.mimeType)),
+        ...codecs.filter((codec) => !/h264/i.test(codec.mimeType)),
+      ])
+      connection.ontrack = (event) => {
+        if (disposed || peer !== connection) return
+        video.srcObject = event.streams[0] ?? new MediaStream([event.track])
+        video.play().catch(() => undefined)
+      }
+      connection.onconnectionstatechange = () => {
+        if (disposed || peer !== connection) return
+        if (connection.connectionState === "failed" || connection.connectionState === "closed") {
+          retry()
+        }
+      }
+
+      await connection.setLocalDescription(await connection.createOffer())
+      await new Promise<void>((resolve) => {
+        if (connection.iceGatheringState === "complete") {
+          resolve()
+          return
+        }
+        const timer = window.setTimeout(resolve, 2000)
+        connection.addEventListener("icegatheringstatechange", () => {
+          if (connection.iceGatheringState !== "complete") return
+          window.clearTimeout(timer)
+          resolve()
+        })
+      })
+      if (disposed || peer !== connection) return
+
+      const response = await fetch(`${baseUrl}/webrtc/offer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "offer",
+          sdp: raiseH264Level(connection.localDescription?.sdp ?? ""),
+          sessionId,
+          codec: "h264",
+        }),
+        signal: controller.signal,
+      })
+      if (!response.ok) throw new Error(`The simulator WebRTC offer returned ${response.status}.`)
+      const answer = (await response.json()) as RTCSessionDescriptionInit
+      if (disposed || peer !== connection) return
+      await connection.setRemoteDescription(answer)
+    }
+
+    const onPlaying = () => {
+      if (disposed) return
+      attempts = 0
+      setIsStreaming(true)
+      if (frameCallback === undefined) frameCallback = video.requestVideoFrameCallback(onFrame)
+    }
+    video.addEventListener("playing", onPlaying)
+
+    connect().catch(() => {
+      if (!controller.signal.aborted) retry()
+    })
+
+    return () => {
+      disposed = true
+      window.clearTimeout(retryTimer)
+      video.removeEventListener("playing", onPlaying)
+      controller.abort()
+      closeSession()
+      setIsStreaming(false)
+    }
+  }, [enabled, frameListener, streamUrl])
+
+  return { videoRef, isStreaming }
+}
+
 function useIOSVideoStream(
   streamUrl: string | undefined,
+  transport: Surface["transport"],
   enabled: boolean,
   frameListener: React.MutableRefObject<((sourceUrl: string) => void) | null>,
   sourceLimit: SourceLimit
@@ -1162,23 +1345,37 @@ function useIOSVideoStream(
     typeof (globalThis as any).VideoDecoder === "function" &&
     typeof (globalThis as any).EncodedVideoChunk === "function"
   const [useMjpegFallback, setUseMjpegFallback] = useState(!supportsAvcc)
+  // A WebRTC server refuses the HTTP streams, so it never falls back to them.
+  const usesWebRtc = transport === "webrtc"
 
   useEffect(() => setUseMjpegFallback(!supportsAvcc), [streamUrl, supportsAvcc])
 
+  const webRtc = useIOSWebRtcStream(streamUrl, enabled && usesWebRtc, frameListener)
   const avcc = useIOSAvccStream(
     streamUrl,
-    enabled && !useMjpegFallback,
+    enabled && !usesWebRtc && !useMjpegFallback,
     () => setUseMjpegFallback(true),
     frameListener,
     sourceLimit
   )
-  const mjpeg = useIOSMjpegStream(streamUrl, enabled && useMjpegFallback)
+  const mjpeg = useIOSMjpegStream(streamUrl, enabled && !usesWebRtc && useMjpegFallback)
+  const mode: "webrtc" | "avcc" | "mjpeg" = usesWebRtc
+    ? "webrtc"
+    : useMjpegFallback
+      ? "mjpeg"
+      : "avcc"
 
   return {
     canvasRef: avcc.canvasRef,
     imageRef: mjpeg.imageRef,
-    isStreaming: useMjpegFallback ? mjpeg.isStreaming : avcc.isStreaming,
-    useMjpegFallback,
+    videoRef: webRtc.videoRef,
+    isStreaming:
+      mode === "webrtc"
+        ? webRtc.isStreaming
+        : mode === "mjpeg"
+          ? mjpeg.isStreaming
+          : avcc.isStreaming,
+    mode,
   }
 }
 
@@ -1456,9 +1653,11 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const {
     canvasRef: iosVideoCanvasRef,
     imageRef: iosVideoImageRef,
-    useMjpegFallback: iosUsesMjpeg,
+    videoRef: iosVideoElementRef,
+    mode: iosStreamMode,
   } = useIOSVideoStream(
     activeVideoStreamUrl,
+    activeSurface?.transport,
     isOpen && Boolean(activeSurface) && !isChoosing,
     iosFrameListener,
     frames.limit
@@ -1877,6 +2076,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
         previewUrl?: string
         streamUrl?: string
         wsUrl?: string
+        transport?: Surface["transport"]
         simulator?: Simulator
       }
       setIsLoading(false)
@@ -1892,6 +2092,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
         previewUrl: result.previewUrl,
         streamUrl: result.streamUrl,
         wsUrl: result.wsUrl,
+        transport: result.transport,
         orientation: "portrait",
       }
       setSimulators((current) =>
@@ -1930,6 +2131,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       previewUrl?: string
       streamUrl?: string
       wsUrl?: string
+      transport?: Surface["transport"]
       simulator?: Simulator
     }
     setIsLoading(false)
@@ -1950,6 +2152,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       previewUrl: result.previewUrl,
       streamUrl: result.streamUrl,
       wsUrl: result.wsUrl,
+      transport: result.transport,
       orientation: "portrait",
     }
     setSimulators((current) => [...current, result.simulator!])
@@ -1999,7 +2202,12 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     const result = (await ipcRenderer.invoke(
       "reconnect-ios-simulator-surface",
       activeSurface.udid
-    )) as IPCResponse & { previewUrl?: string; streamUrl?: string; wsUrl?: string }
+    )) as IPCResponse & {
+      previewUrl?: string
+      streamUrl?: string
+      wsUrl?: string
+      transport?: Surface["transport"]
+    }
     if (!result.ok || !result.previewUrl || !result.streamUrl || !result.wsUrl) {
       setStatus(result.message || "Could not reconnect the simulator preview.")
       setIsError(true)
@@ -2014,6 +2222,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
               previewUrl: result.previewUrl!,
               streamUrl: result.streamUrl!,
               wsUrl: result.wsUrl!,
+              transport: result.transport,
             }
           : surface
       )
@@ -2034,6 +2243,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
       previewUrl?: string
       streamUrl?: string
       wsUrl?: string
+      transport?: Surface["transport"]
     }
     if (result.cancelled) {
       setStatus("")
@@ -2053,6 +2263,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
               previewUrl: result.previewUrl!,
               streamUrl: result.streamUrl!,
               wsUrl: result.wsUrl!,
+              transport: result.transport,
             }
           : surface
       )
@@ -2286,7 +2497,13 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   useEffect(() => {
     const handleMoved = (
       _event: unknown,
-      moved: { udid: string; previewUrl: string; streamUrl: string; wsUrl: string }
+      moved: {
+        udid: string
+        previewUrl: string
+        streamUrl: string
+        wsUrl: string
+        transport?: Surface["transport"]
+      }
     ) => {
       setSurfaces((current) =>
         current.map((surface) =>
@@ -2296,6 +2513,7 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                 previewUrl: moved.previewUrl,
                 streamUrl: moved.streamUrl,
                 wsUrl: moved.wsUrl,
+                transport: moved.transport,
               }
             : surface
         )
@@ -2860,8 +3078,14 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                   {render3D && (
                     <DeviceViewport
                       label={`${activeSurface.name} simulator, 3D`}
-                      sourceRef={iosUsesMjpeg ? iosVideoImageRef : iosVideoCanvasRef}
-                      sourceKey={`ios:${activeSurface.udid}:${iosUsesMjpeg ? "mjpeg" : "avcc"}`}
+                      sourceRef={
+                        iosStreamMode === "webrtc"
+                          ? iosVideoElementRef
+                          : iosStreamMode === "mjpeg"
+                            ? iosVideoImageRef
+                            : iosVideoCanvasRef
+                      }
+                      sourceKey={`ios:${activeSurface.udid}:${iosStreamMode}`}
                       frames={frames}
                       orientation={activeOrientation}
                       profile={activeProfile}
@@ -2889,7 +3113,19 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     role="application"
                     tabIndex={render3D ? -1 : 0}
                   >
-                    {iosUsesMjpeg ? (
+                    {iosStreamMode === "webrtc" ? (
+                      <VideoPreview
+                        ref={iosVideoElementRef}
+                        $rotation={activeStreamRotation}
+                        $screenWidth={activeScreenWidth}
+                        $screenHeight={activeScreenHeight}
+                        aria-label={`${activeSurface.name} simulator screen`}
+                        autoPlay
+                        muted
+                        playsInline
+                        disablePictureInPicture
+                      />
+                    ) : iosStreamMode === "mjpeg" ? (
                       <FallbackPreview
                         ref={iosVideoImageRef}
                         $rotation={activeStreamRotation}

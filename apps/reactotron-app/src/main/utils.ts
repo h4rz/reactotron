@@ -46,21 +46,9 @@ type AndroidDevice = {
   type: "emulator" | "physical"
 }
 
-/**
- * "webrtc" surfaces are played by Chromium's media pipeline in a <video>; "http"
- * ones are decoded frame by frame in the renderer.
- */
-type ServeSimTransport = "http" | "webrtc"
-type ServeSimSurface = {
-  previewUrl: string
-  streamUrl: string
-  wsUrl: string
-  transport: ServeSimTransport
-}
-
 const serveSimProcesses = new Map<
   string,
-  { process: childProcess.ChildProcess; previewUrl: string; transport: ServeSimTransport }
+  { process: childProcess.ChildProcess; previewUrl: string }
 >()
 const simulatorRecordings = new Map<
   string,
@@ -70,7 +58,10 @@ const androidRecordings = new Map<
   string,
   { remotePath: string; process: childProcess.ChildProcess }
 >()
-const serveSimStarts = new Map<string, Promise<ServeSimSurface>>()
+const serveSimStarts = new Map<
+  string,
+  Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }>
+>()
 let simulatorSurfaceWindow: BrowserWindow | null = null
 const iosSimulatorUdid = /^[A-Fa-f0-9-]{36}$/
 const SERVE_SIM_PORT_ATTEMPTS = 5
@@ -311,15 +302,6 @@ async function runAndroidDeviceCommand(
   ])
 }
 
-function hasServeSimCli(expo: boolean): boolean {
-  try {
-    getServeSimCliPath(expo)
-    return true
-  } catch {
-    return false
-  }
-}
-
 function getServeSimCliPath(duo: boolean): string {
   const cliPath = duo
     ? path.join("node_modules", "@expo", "serve-sim", "dist", "serve-sim.js")
@@ -530,7 +512,9 @@ async function getIOSSimulatorCreationOptions(): Promise<IOSSimulatorCreationOpt
     }))
 }
 
-function startServeSim(udid: string): Promise<ServeSimSurface> {
+function startServeSim(
+  udid: string
+): Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }> {
   // Opening a surface and reconnecting it can both be in flight at once, and a
   // process is only registered after it reports a successful start. Two callers
   // arriving before that point would each see no server and spawn their own,
@@ -569,7 +553,9 @@ function restartServeSimForSurface(udid: string): void {
  * Replace the server behind a surface, sharing the guard with `startServeSim`
  * so the teardown and the spawn cannot be interleaved with another start.
  */
-function restartServeSim(udid: string): Promise<ServeSimSurface> {
+function restartServeSim(
+  udid: string
+): Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }> {
   const restart = stopServeSim(udid)
     .then(() => {
       // stopServeSim clears the guard, so claim it again for the spawn that
@@ -584,7 +570,9 @@ function restartServeSim(udid: string): Promise<ServeSimSurface> {
   return restart
 }
 
-async function startServeSimUnguarded(udid: string): Promise<ServeSimSurface> {
+async function startServeSimUnguarded(
+  udid: string
+): Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }> {
   const existingSurface = serveSimProcesses.get(udid)
   if (existingSurface && existingSurface.process.exitCode === null) {
     const previewUrl = existingSurface.previewUrl
@@ -592,7 +580,6 @@ async function startServeSimUnguarded(udid: string): Promise<ServeSimSurface> {
       previewUrl,
       streamUrl: `${previewUrl.replace(/\?.*$/, "")}/helper/${udid}/stream.mjpeg`,
       wsUrl: `ws://127.0.0.1:${new URL(previewUrl).port}/helper/${udid}/ws`,
-      transport: existingSurface.transport,
     }
   }
 
@@ -616,25 +603,16 @@ async function startServeSimUnguarded(udid: string): Promise<ServeSimSurface> {
   throw lastError ?? new Error("Could not start the simulator preview.")
 }
 
-async function spawnServeSim(udid: string): Promise<ServeSimSurface> {
+async function spawnServeSim(
+  udid: string
+): Promise<{ previewUrl: string; streamUrl: string; wsUrl: string }> {
   const port = await getServeSimPort()
   const previewUrl = `http://127.0.0.1:${port}?device=${udid}&session=${Date.now()}`
   const simulator = (await getAvailableIOSSimulators()).find((item) => item.udid === udid)
   if (!simulator) throw new Error("That iOS simulator is no longer available.")
-  const isAppleSilicon = process.arch === "arm64"
-  const duo = /iPhone Duo/i.test(simulator.name) && isAppleSilicon
-  // Expo's serve-sim sends WebRTC, which the renderer hands to Chromium's video
-  // pipeline instead of decoding and painting every frame itself; a screen
-  // playing video otherwise kept the renderer busy enough to stall the whole
-  // app. Its native module is arm64-only, and Duo keeps the per-panel HTTP
-  // streams its hinge controls are built on.
-  const transport: ServeSimTransport =
-    isAppleSilicon && !duo && hasServeSimCli(true) ? "webrtc" : "http"
   const runner = getServeSimRunner(
-    transport === "webrtc"
-      ? ["--port", String(port), "--transport", "webrtc", udid]
-      : ["--port", String(port), "--codec", "auto", udid],
-    duo || transport === "webrtc"
+    ["--port", String(port), "--codec", "auto", udid],
+    /iPhone Duo/i.test(simulator.name) && process.arch === "arm64"
   )
   const serveSimProcess = childProcess.spawn(runner.command, runner.args, {
     shell: false,
@@ -664,12 +642,11 @@ async function spawnServeSim(udid: string): Promise<ServeSimSurface> {
         }, SERVE_SIM_EXIT_TIMEOUT).unref()
         reject(error)
       } else {
-        serveSimProcesses.set(udid, { process: serveSimProcess, previewUrl, transport })
+        serveSimProcesses.set(udid, { process: serveSimProcess, previewUrl })
         resolve({
           previewUrl,
           streamUrl: `http://127.0.0.1:${port}/helper/${udid}/stream.mjpeg`,
           wsUrl: `ws://127.0.0.1:${port}/helper/${udid}/ws`,
-          transport,
         })
       }
     }

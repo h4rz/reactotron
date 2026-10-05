@@ -14,6 +14,7 @@ import type { DeviceShapeProfile } from "./scene/shapeProfile"
 import {
   createDeviceViewer,
   renderPixelRatio,
+  type DecodedFrame,
   type DeviceViewer,
   type DuoState,
   type FrameSource,
@@ -78,8 +79,12 @@ function readDeviceModel(id: DeviceModelId) {
   return pending
 }
 
-/** The tallest source frame worth decoding into the canvas; null means full size. */
-export type SourceLimit = { height: number | null }
+/**
+ * Set while the 3D view is showing: the tallest source frame worth decoding into
+ * the canvas (null means full size, and flat mode), and the newest decoded frame
+ * for the 3D view to upload directly. Whoever replaces or drops a frame closes it.
+ */
+export type SourceLimit = { height: number | null; frame: DecodedFrame | null }
 
 export type FrameSignal = {
   limit: SourceLimit
@@ -92,7 +97,7 @@ export function useFrameSignal(): FrameSignal {
   const listeners = useRef(new Set<() => void>())
   return useMemo(
     () => ({
-      limit: { height: null },
+      limit: { height: null, frame: null },
       notify: () => listeners.current.forEach((listener) => listener()),
       subscribe: (listener) => {
         listeners.current.add(listener)
@@ -218,6 +223,11 @@ function DeviceViewport({
         profile: latest.current.profile,
         duo: latest.current.duo,
         onUnavailable: () => latest.current.onUnavailable(),
+        takeFrame: () => {
+          const frame = frames.limit.frame
+          frames.limit.frame = null
+          return frame
+        },
       })
     } catch {
       latest.current.onUnavailable()
@@ -255,6 +265,8 @@ function DeviceViewport({
 
     return () => {
       frames.limit.height = null
+      frames.limit.frame?.close()
+      frames.limit.frame = null
       unsubscribe()
       if (source instanceof HTMLImageElement) source.removeEventListener("load", onImageLoad)
       window.removeEventListener("blur", blur)

@@ -821,6 +821,13 @@ function keyboardFrames(key: string, shift = false): KeyboardFrame[] | null {
     : frames
 }
 
+/** While the 3D view is showing, hand it its own copy of each decoded frame. */
+function offerFrame(sourceLimit: SourceLimit, frame: any) {
+  if (sourceLimit.height === null) return
+  sourceLimit.frame?.close()
+  sourceLimit.frame = frame.clone()
+}
+
 /**
  * Paint a decoded frame into the source canvas. While the 3D view is showing it
  * sets a height limit near its own drawing size: uploading a native 1206x2622
@@ -1042,6 +1049,7 @@ function useIOSAvccStream(
       new VideoDecoderConstructor({
         output: (frame: any) => {
           try {
+            offerFrame(sourceLimit, frame)
             paint(frame, frame.displayWidth, frame.displayHeight)
           } finally {
             frame.close()
@@ -1231,6 +1239,7 @@ function useAndroidVideoStream(
             lastFrameSize = { width: frame.displayWidth, height: frame.displayHeight }
             onSizeRef.current(lastFrameSize)
           }
+          offerFrame(sourceLimit, frame)
           drawLimited(canvas, frame, frame.displayWidth, frame.displayHeight, sourceLimit.height)
           onFrameRef.current()
         }

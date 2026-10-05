@@ -31,6 +31,13 @@ import { IOS_PHONE_SHAPE, type DeviceShapeProfile } from "./shapeProfile"
 /** The decoded picture. The caller owns it and the stream that fills it. */
 export type FrameSource = HTMLCanvasElement | HTMLImageElement
 
+/** A WebCodecs VideoFrame handed over by the decoder; the viewer closes it. */
+export type DecodedFrame = {
+  readonly displayWidth: number
+  readonly displayHeight: number
+  close(): void
+}
+
 /** Hinge state for an iPhone Duo; null renders a single-slab phone or tablet. */
 export type DuoState = { angle: number; coverActive: boolean }
 
@@ -51,10 +58,9 @@ export interface DeviceViewer {
 }
 
 const DUO_TURN_MS = 650
-// Each screen update costs a texture copy in the GPU process, which dominates 3D's
-// cost on a busy stream. 20 a second keeps scrolling readable at under half the
-// load of a 60 fps stream (measured: ~46% of a core versus ~95% uncapped).
-const MIN_FRAME_INTERVAL_MS = 1000 / 20
+// Each screen update still costs a texture upload, a mipmap rebuild and a redraw.
+// 20 a second looked choppy; 30 keeps navigation smooth.
+const MIN_FRAME_INTERVAL_MS = 1000 / 30
 
 function sourceSize(source: FrameSource) {
   return source instanceof HTMLImageElement
@@ -98,6 +104,8 @@ export function createDeviceViewer(options: {
   readonly model?: Group | null
   readonly skin?: DeviceSkin | null
   readonly onModelRejected?: (cause: unknown) => void
+  /** The newest decoded frame not yet taken, or null; snapshots `source` when absent. */
+  readonly takeFrame?: () => DecodedFrame | null
 }): DeviceViewer {
   const renderer = new WebGLRenderer({
     canvas: options.canvas,
@@ -125,6 +133,9 @@ export function createDeviceViewer(options: {
   }
   let texture = makeTexture()
   let textureSize = sourceSize(source)
+  // The size the texture's storage was allocated at. three.js cannot resize it in
+  // place, so an image of another size needs a fresh texture.
+  let uploadSize = textureSize
   const scene = new Scene()
   const camera = new PerspectiveCamera(32, 1, 0.1, 30)
   camera.position.z = 5.5
@@ -253,7 +264,8 @@ export function createDeviceViewer(options: {
       framing.advance(now, reducedMotion())
       applyCamera()
       renderer.render(scene, camera)
-      while (retiredBitmaps.length) retiredBitmaps.pop()?.close()
+      unuploaded = null
+      while (retiredImages.length) retiredImages.pop()?.close()
       if (motion.needsFrame() || framing.needsFrame() || duoTurn) scheduler.invalidate()
     } catch {
       options.onUnavailable()
@@ -270,6 +282,8 @@ export function createDeviceViewer(options: {
       const previous = texture
       texture = makeTexture()
       textureSize = size
+      uploadSize = size
+      retire(previous.image)
       previous.dispose()
     }
     const aspect = rawAspect()
@@ -294,14 +308,58 @@ export function createDeviceViewer(options: {
 
   let lastFrameAt = -Infinity
   let frameTimer: number | undefined
-  // Snapshots already uploaded; released once the next frame has rendered.
-  const retiredBitmaps: ImageBitmap[] = []
+  // Images already uploaded; released once the next frame has rendered.
+  const retiredImages: { close(): void }[] = []
+  // The newest image, until a render uploads it. A hidden window never renders, so
+  // replacing it closes it at once; queuing it would hold every decoded frame and
+  // starve the decoder's frame pool.
+  let unuploaded: unknown = null
+  const retire = (image: unknown) => {
+    const closable = image as { close?: () => void } | null
+    if (typeof closable?.close !== "function") return
+    if (image === unuploaded) {
+      closable.close()
+      unuploaded = null
+    } else {
+      retiredImages.push(closable as { close(): void })
+    }
+  }
+  const showImage = (image: object, size: { width: number; height: number }, flipY: boolean) => {
+    if (size.width !== uploadSize.width || size.height !== uploadSize.height) {
+      const previous = texture
+      texture = makeTexture()
+      uploadSize = size
+      retire(previous.image)
+      previous.dispose()
+      if ("setAngle" in device) device.setDisplay(texture, layout, duo?.coverActive ?? false)
+      else device.setDisplay(texture, layout)
+    }
+    retire(texture.image)
+    texture.image = image
+    unuploaded = image
+    texture.flipY = flipY
+    texture.needsUpdate = true
+    scheduler.invalidate()
+  }
   let snapshotPending = false
   const applyFrame = () => {
     frameTimer = undefined
     if (disposed) return
     lastFrameAt = performance.now()
     updateLayout()
+    // A decoded frame uploads GPU to GPU. Snapshotting the 2D canvas instead held
+    // the GPU process's main thread for up to 150 ms a frame during navigation.
+    const frame = options.takeFrame?.()
+    if (frame) {
+      const size = { width: frame.displayWidth, height: frame.displayHeight }
+      // three.js sizes textures from width and height, which a VideoFrame lacks.
+      Object.defineProperties(frame, {
+        width: { value: size.width },
+        height: { value: size.height },
+      })
+      showImage(frame, size, true)
+      return
+    }
     // Uploading the 2D canvas itself makes Chromium read it back on every frame.
     // An ImageBitmap snapshot stays on the GPU, so the upload is a GPU copy.
     if (typeof createImageBitmap !== "function" || snapshotPending) {
@@ -319,12 +377,8 @@ export function createDeviceViewer(options: {
           bitmap.close()
           return
         }
-        if (texture.image instanceof ImageBitmap) retiredBitmaps.push(texture.image)
-        texture.image = bitmap
         // createImageBitmap already flipped it; WebGL ignores UNPACK_FLIP_Y for bitmaps.
-        texture.flipY = false
-        texture.needsUpdate = true
-        scheduler.invalidate()
+        showImage(bitmap, { width: bitmap.width, height: bitmap.height }, false)
       })
       .catch(() => {
         snapshotPending = false
@@ -453,6 +507,8 @@ export function createDeviceViewer(options: {
       options.canvas.removeEventListener("webglcontextlost", contextLost)
       scene.remove(device.root)
       device.dispose()
+      retire(texture.image)
+      while (retiredImages.length) retiredImages.pop()?.close()
       texture.dispose()
       renderer.dispose()
       renderer.forceContextLoss()

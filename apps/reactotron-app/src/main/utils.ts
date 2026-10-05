@@ -65,6 +65,7 @@ const serveSimStarts = new Map<
 let simulatorSurfaceWindow: BrowserWindow | null = null
 const iosSimulatorUdid = /^[A-Fa-f0-9-]{36}$/
 const SERVE_SIM_PORT_ATTEMPTS = 5
+const SERVE_SIM_MAX_DIMENSION = 1600
 const SERVE_SIM_EXIT_TIMEOUT = 3000
 const SERVE_SIM_FORCE_KILL_TIMEOUT = 500
 const androidVideoStreams = new Map<string, AndroidScrcpyStream>()
@@ -624,9 +625,20 @@ async function spawnServeSim(
   // on the same screen. Its native module is arm64-only, so Intel Macs keep the
   // original.
   const isDuo = /iPhone Duo/i.test(simulator.name)
+  const useExpo = process.arch === "arm64" && (isDuo || hasExpoServeSim())
+  // Native frames (1206x2622 on an iPhone 18 Pro) are drawn about 1400 pixels
+  // tall in the panel, so pixels beyond 1600 are encoded, decoded and uploaded
+  // for nothing. The original package has no such option.
   const runner = getServeSimRunner(
-    ["--port", String(port), "--codec", "auto", udid],
-    process.arch === "arm64" && (isDuo || hasExpoServeSim())
+    [
+      "--port",
+      String(port),
+      "--codec",
+      "auto",
+      ...(useExpo ? ["--max-dimension", String(SERVE_SIM_MAX_DIMENSION)] : []),
+      udid,
+    ],
+    useExpo
   )
   const serveSimProcess = childProcess.spawn(runner.command, runner.args, {
     shell: false,

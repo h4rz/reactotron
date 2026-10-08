@@ -39,6 +39,11 @@ export interface ServerOptions {
   port: number
 
   /**
+   * Which interface to listen on. Default: every interface.
+   */
+  host?: string
+
+  /**
    * Web Socket Secure Configuration
    */
   wss?: WssServerOptions

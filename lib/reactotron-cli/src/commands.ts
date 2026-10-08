@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
 import type { ParsedArguments } from "./arguments"
 import { jsonFlag, numberFlag, requiredFlag, requiredPositional, stringFlag } from "./arguments"
 import type { ReactotronAgentClient, ToolCallResult } from "./client"
@@ -304,6 +305,101 @@ async function tap(context: CommandContext): Promise<CommandResult> {
   return { status: "success", summary: `Stopped timeline stream after ${emitted} event(s).` }
 }
 
+async function runDevice(
+  context: CommandContext,
+  subcommand: string | undefined
+): Promise<CommandResult> {
+  const { client, args } = context
+  const deviceId = () => requiredPositional(args, 2, "Device id")
+  const out = stringFlag(args, "out")
+  switch (subcommand) {
+    case "list":
+      return call(client, args, "list_devices")
+    case "boot":
+      return call(client, args, "boot_device", { deviceId: deviceId() })
+    case "shutdown":
+      if (!args.flags.confirm) throw new Error("device shutdown requires --confirm.")
+      return call(client, args, "shutdown_device", { deviceId: deviceId(), confirm: true })
+    case "screenshot":
+      return call(client, args, "device_screenshot", { deviceId: deviceId() })
+    case "record": {
+      const action = requiredPositional(args, 2, "record start|stop")
+      const id = requiredPositional(args, 3, "Device id")
+      if (action === "start") return call(client, args, "device_record_start", { deviceId: id })
+      if (action === "stop")
+        return call(client, args, "device_record_stop", {
+          deviceId: id,
+          ...(out ? { outputPath: resolve(out) } : {}),
+        })
+      throw new Error("Use device record start|stop DEVICE_ID.")
+    }
+    case "home":
+      return call(client, args, "device_home", { deviceId: deviceId() })
+    case "appearance":
+      return call(client, args, "device_appearance", {
+        deviceId: deviceId(),
+        appearance: args.positionals[3] ?? "toggle",
+      })
+    case "rotate":
+      return call(client, args, "device_rotate", {
+        deviceId: deviceId(),
+        orientation: requiredPositional(args, 3, "Orientation (portrait|landscape)"),
+      })
+    case "open-url":
+      return call(client, args, "device_open_url", {
+        deviceId: deviceId(),
+        url: requiredPositional(args, 3, "URL"),
+      })
+    case "launch":
+    case "terminate":
+      return call(client, args, subcommand === "launch" ? "device_launch_app" : "device_terminate_app", {
+        deviceId: deviceId(),
+        appId: requiredPositional(args, 3, "App id"),
+      })
+    default:
+      throw new Error(`Unknown device command: ${subcommand ?? "(missing)"}`)
+  }
+}
+
+async function runFlowCommand(
+  context: CommandContext,
+  subcommand: string | undefined
+): Promise<CommandResult> {
+  const { client, args } = context
+  switch (subcommand) {
+    case "record": {
+      const action = requiredPositional(args, 2, "record start|stop")
+      if (action === "start") return call(client, args, "flow_record_start", { name: args.positionals[3] })
+      if (action === "stop") {
+        const out = stringFlag(args, "out")
+        return call(client, args, "flow_record_stop", out ? { outputPath: resolve(out) } : {})
+      }
+      throw new Error("Use flow record start [NAME] or flow record stop [--out FILE].")
+    }
+    case "run": {
+      // Paths resolve here because the server may run with a different cwd.
+      const result = await client.callTool("flow_run", {
+        path: resolve(requiredPositional(args, 2, "Flow file")),
+        continueOnFailure: Boolean(args.flags["continue-on-failure"]),
+      })
+      const report: any = result.data
+      const passed = report?.status === "passed"
+      const failure = report?.results?.find((step: any) => !step.ok)
+      return {
+        status: passed ? "success" : "error",
+        summary: passed
+          ? `Flow passed: ${report.ran}/${report.steps} steps in ${report.durationMs}ms.`
+          : failure
+            ? `Flow failed at step ${failure.index + 1}: ${failure.message}`
+            : `Flow failed: ${report?.message ?? "unknown error"}`,
+        data: report,
+      }
+    }
+    default:
+      throw new Error(`Unknown flow command: ${subcommand ?? "(missing)"}`)
+  }
+}
+
 export async function runCommand(context: CommandContext): Promise<CommandResult> {
   const { client, args } = context
   const [command, subcommand] = args.positionals
@@ -376,6 +472,14 @@ export async function runCommand(context: CommandContext): Promise<CommandResult
       throw new Error(`Unknown overlay command: ${subcommand ?? "(missing)"}`)
     case "ios":
       return runIos(context, subcommand)
+    case "device":
+      return runDevice(context, subcommand)
+    case "flow":
+      return runFlowCommand(context, subcommand)
+    case "reload": {
+      const metroPort = numberFlag(args, "metro-port")
+      return call(client, args, "reload_app", metroPort === undefined ? {} : { metroPort })
+    }
     case "tap":
       return tap(context)
     case "read": {

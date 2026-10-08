@@ -5,6 +5,8 @@ export interface ParsedArguments {
 
 const BOOLEAN_FLAGS = new Set([
   "confirm",
+  "continue-on-failure",
+  "detach",
   "help",
   "include-existing",
   "json",

@@ -38,10 +38,15 @@
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
   "devDependencies": {
     "@types/node": "^18.18.8",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
+    "reactotron-core-server": "workspace:*",
+    "reactotron-mcp": "workspace:*",
     "rimraf": "5.0.5",
     "ts-jest": "^29.1.1",
     "tsup": "^8.0.0",

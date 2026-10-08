@@ -85,3 +85,54 @@ describe("friendly command aliases", () => {
     expect(writeEvent).toHaveBeenCalledWith({ type: "log", date: 1 })
   })
 })
+
+describe("device and flow commands", () => {
+  test("maps device record stop with an absolute output path", async () => {
+    const mock = client()
+    await runCommand({
+      client: mock as any,
+      args: parseArguments(["device", "record", "stop", "emulator-5554", "--out", "/tmp/run.mp4"]),
+    })
+
+    expect(mock.callTool).toHaveBeenCalledWith("device_record_stop", {
+      deviceId: "emulator-5554",
+      outputPath: "/tmp/run.mp4",
+    })
+  })
+
+  test("defaults device appearance to toggle", async () => {
+    const mock = client()
+    await runCommand({ client: mock as any, args: parseArguments(["device", "appearance", "SIM-1"]) })
+
+    expect(mock.callTool).toHaveBeenCalledWith("device_appearance", {
+      deviceId: "SIM-1",
+      appearance: "toggle",
+    })
+  })
+
+  test("reports a failed flow as an error with the failing step", async () => {
+    const mock = client()
+    mock.callTool.mockResolvedValue({
+      data: {
+        status: "failed",
+        steps: 2,
+        ran: 1,
+        results: [{ index: 0, ok: false, message: "app did not answer" }],
+      },
+      artifacts: [],
+      isError: false,
+    })
+
+    const result = await runCommand({
+      client: mock as any,
+      args: parseArguments(["flow", "run", "/tmp/login.json"]),
+    })
+
+    expect(mock.callTool).toHaveBeenCalledWith("flow_run", {
+      path: "/tmp/login.json",
+      continueOnFailure: false,
+    })
+    expect(result.status).toBe("error")
+    expect(result.summary).toBe("Flow failed at step 1: app did not answer")
+  })
+})

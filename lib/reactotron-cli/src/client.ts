@@ -1,3 +1,5 @@
+import { DESKTOP_MCP_PORTS, readHeadlessState } from "./headless-state"
+
 export interface McpClientOptions {
   url?: string
   host?: string
@@ -18,7 +20,6 @@ interface JsonRpcResponse {
   error?: { code?: number; message?: string; data?: unknown }
 }
 
-const DEFAULT_PORTS = [4567, 4568]
 const PROTOCOL_VERSION = "2025-03-26"
 
 function trimEndpoint(url: string): string {
@@ -69,9 +70,10 @@ export class ReactotronAgentClient {
     } else if (options.port) {
       this.candidates = [`http://${options.host ?? "127.0.0.1"}:${options.port}/mcp`]
     } else {
-      this.candidates = DEFAULT_PORTS.map(
-        (port) => `http://${options.host ?? "127.0.0.1"}:${port}/mcp`
-      )
+      // The desktop app is preferred; a running headless server is the fallback.
+      const headless = readHeadlessState()
+      const ports = headless ? [...DESKTOP_MCP_PORTS, headless.mcpPort] : DESKTOP_MCP_PORTS
+      this.candidates = ports.map((port) => `http://${options.host ?? "127.0.0.1"}:${port}/mcp`)
     }
   }
 

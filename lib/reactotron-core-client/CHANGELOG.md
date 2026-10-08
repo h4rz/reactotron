@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [2.11.6](https://github.com/hurajgor/reactotron/compare/reactotron-core-client@2.11.5...reactotron-core-client@2.11.6) (2026-10-08)
+
+
+### Bug Fixes
+
+* **release:** migrate scoped package links to h4rz ([e0ed625](https://github.com/hurajgor/reactotron/commit/e0ed6259e592cde2550ab110f213409ccbd2ed1d))
+
 ## [2.11.0](https://github.com/infinitered/reactotron/compare/@hurajgor/reactotron-core-client@2.10.0...@hurajgor/reactotron-core-client@2.11.0) (2026-07-14)
 
 ### Features

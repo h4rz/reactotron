@@ -4700,7 +4700,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hurajgor/reactotron-core-client@npm:2.11.5, @hurajgor/reactotron-core-client@workspace:*, @hurajgor/reactotron-core-client@workspace:lib/reactotron-core-client":
+"@hurajgor/reactotron-core-client@npm:2.11.6, @hurajgor/reactotron-core-client@workspace:*, @hurajgor/reactotron-core-client@workspace:lib/reactotron-core-client":
   version: 0.0.0-use.local
   resolution: "@hurajgor/reactotron-core-client@workspace:lib/reactotron-core-client"
   dependencies:
@@ -5044,7 +5044,7 @@ __metadata:
     "@babel/plugin-transform-react-jsx": "npm:^7.22.15"
     "@babel/preset-env": "npm:^7.23.2"
     "@babel/preset-typescript": "npm:^7.23.2"
-    "@hurajgor/reactotron-core-client": "npm:2.11.5"
+    "@hurajgor/reactotron-core-client": "npm:2.11.6"
     "@hurajgor/reactotron-core-contract": "npm:0.6.0"
     "@react-native-async-storage/async-storage": "npm:^1.19.4"
     "@types/jest": "npm:^29.5.7"

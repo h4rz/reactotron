@@ -46,7 +46,7 @@
     "react-native": ">=0.40.0"
   },
   "dependencies": {
-    "@hurajgor/reactotron-core-client": "2.11.5",
+    "@hurajgor/reactotron-core-client": "2.11.6",
     "@hurajgor/reactotron-core-contract": "0.6.0",
     "mitt": "^3.0.1"
   },

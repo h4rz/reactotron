@@ -3,6 +3,7 @@ import { ipcRenderer } from "electron"
 import Server, { createServer } from "reactotron-core-server"
 import {
   createMcpServer,
+  createNodeDeviceHost,
   type ReactotronDesktopHost,
   type ReactotronMcpServer,
   type McpRedactionServerConfig,
@@ -35,6 +36,9 @@ const desktopMcpHost: ReactotronDesktopHost = {
   captureIOSSimulatorScreenshot: (udid) =>
     ipcRenderer.invoke("capture-ios-simulator-screenshot", udid),
 }
+
+// Same simctl/adb tools the headless CLI server exposes, so agents get one tool set either way.
+const deviceMcpHost = createNodeDeviceHost()
 
 type ReactotronGlobal = typeof globalThis & {
   __REACTOTRON_DESKTOP_SERVER__?: Server
@@ -329,7 +333,12 @@ const Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setMcpPort(null)
     } else {
       const port = getConfiguredMcpPort()
-      const mcp = createMcpServer(reactotronServer.current, mcpRedactionConfig, desktopMcpHost)
+      const mcp = createMcpServer(
+        reactotronServer.current,
+        mcpRedactionConfig,
+        desktopMcpHost,
+        deviceMcpHost
+      )
       mcp
         .start(port)
         .then(() => {

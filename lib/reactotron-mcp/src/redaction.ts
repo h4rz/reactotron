@@ -1,5 +1,5 @@
 import type { McpRedactionRules, McpRedactionConfig } from "@hurajgor/reactotron-core-contract"
-import type ReactotronServer from "reactotron-core-server"
+import type ReactotronServer from "@hurajgor/reactotron-core-server"
 
 export const REDACTED = "[REDACTED]"
 

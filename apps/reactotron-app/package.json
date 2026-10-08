@@ -61,7 +61,9 @@
   "dependencies": {
     "@h4rz/serve-sim-device": "git@github.com:h4rz/serve-sim.git#workspace=@h4rz/serve-sim-device&commit=d6bed84996c162cfcdf2c9c95bf77e0323ac6eae",
     "@hurajgor/reactotron-core-contract": "workspace:*",
+    "@hurajgor/reactotron-core-server": "workspace:*",
     "@hurajgor/reactotron-core-ui": "workspace:*",
+    "@hurajgor/reactotron-mcp": "workspace:*",
     "electron-log": "^5.0.0",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.1.7",
@@ -76,8 +78,6 @@
     "react-motion": "0.5.2",
     "react-router-dom": "^6.18.0",
     "react-tooltip": "4.5.1",
-    "reactotron-core-server": "workspace:*",
-    "reactotron-mcp": "workspace:*",
     "serve-sim": "0.1.47",
     "source-map-support": "^0.5.21",
     "styled-components": "^6.1.0",

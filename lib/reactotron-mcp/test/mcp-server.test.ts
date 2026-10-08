@@ -1,5 +1,5 @@
 import { getPort } from "get-port-please"
-import { createServer } from "reactotron-core-server"
+import { createServer } from "@hurajgor/reactotron-core-server"
 import { createMcpServer } from "../src/mcp-server"
 import type { ReactotronDesktopHost } from "../src/desktop-host"
 import WebSocket from "ws"

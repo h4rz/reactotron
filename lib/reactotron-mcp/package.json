@@ -1,29 +1,35 @@
 {
-  "name": "reactotron-mcp",
+  "name": "@hurajgor/reactotron-mcp",
   "version": "0.1.0",
-  "private": true,
-  "description": "MCP server for Reactotron — lets Claude Code read debug events and send commands to connected apps.",
+  "description": "MCP server for Reactotron: lets agents read debug events, drive the UI and control devices.",
   "author": "Infinite Red",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/hurajgor/reactotron/issues"
+    "url": "https://github.com/h4rz/reactotron/issues"
   },
-  "homepage": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-mcp",
-  "repository": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-mcp",
+  "homepage": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-mcp",
+  "repository": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-mcp",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/commonjs/index.js",
+  "module": "./dist/module/index.js",
+  "types": "./dist/typescript/commonjs/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "source": "./src/index.ts",
+      "types": "./dist/typescript/commonjs/src/index.d.ts",
+      "module": "./dist/module/index.js",
+      "default": "./dist/commonjs/index.js"
     },
     "./package.json": "./package.json"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "build": "tsup",
+    "build": "rimraf ./dist && tsup",
     "clean": "rimraf ./dist",
     "test": "jest",
     "typecheck": "tsc --noEmit"
@@ -33,16 +39,16 @@
     "zod": "^4.3.0"
   },
   "peerDependencies": {
-    "@hurajgor/reactotron-core-contract": "workspace:*",
-    "reactotron-core-server": "workspace:*"
+    "@hurajgor/reactotron-core-contract": "*",
+    "@hurajgor/reactotron-core-server": "*"
   },
   "devDependencies": {
     "@hurajgor/reactotron-core-contract": "workspace:*",
+    "@hurajgor/reactotron-core-server": "workspace:*",
     "@types/node": "^18.18.8",
     "get-port-please": "^3.1.1",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
-    "reactotron-core-server": "workspace:*",
     "rimraf": "5.0.5",
     "ts-jest": "^29.1.1",
     "tsup": "^8.0.0",

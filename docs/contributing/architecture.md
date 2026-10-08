@@ -26,7 +26,7 @@ These workspaces are used to build the Electron app that runs Reactotron.
 
 - `reactotron-app` - The Electron app that runs Reactotron.
 - `@hurajgor/reactotron-core-ui` - UI components used by Reactotron. This was created to allow for other types of Reactotron clients to be built.
-- `reactotron-core-server` - The server that receives commands from the client and publishes them to subscribers. This server is started when the Reactotron Electron app is started.
+- `@hurajgor/reactotron-core-server` - The server that receives commands from the client and publishes them to subscribers. This server is started when the Reactotron Electron app is started.
 
 ### Reactotron client
 

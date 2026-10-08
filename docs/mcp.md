@@ -203,15 +203,15 @@ The `show_overlay` tool lets Claude Code overlay an image on your running app �
 
 ## Architecture
 
-The MCP server runs inside the Reactotron desktop app as a separate package (`reactotron-mcp`). It reads directly from the relay server's connections and event stream — no proxy, no separate process, and no changes to your React Native app.
+The MCP server runs inside the Reactotron desktop app as a separate package (`@hurajgor/reactotron-mcp`). It reads directly from the relay server's connections and event stream — no proxy, no separate process, and no changes to your React Native app.
 
 ```text
 React Native app
     | WebSocket (port 9090, unchanged)
     v
 Reactotron Desktop
-    ├── relay server (reactotron-core-server)
-    └── MCP server (reactotron-mcp, HTTP on a local port)
+    ├── relay server (@hurajgor/reactotron-core-server)
+    └── MCP server (@hurajgor/reactotron-mcp, HTTP on a local port)
           ↑
           ├── coding assistant
           └── desktop host (Agent runtime and iOS Simulator tools)

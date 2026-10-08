@@ -1,6 +1,6 @@
 # @hurajgor/reactotron-core-contract
 
-TypeScript contracts for WebSocket messages between `reactotron-core-server` and `@hurajgor/reactotron-core-client`.
+TypeScript contracts for WebSocket messages between `@hurajgor/reactotron-core-server` and `@hurajgor/reactotron-core-client`.
 
 This package provides the type definitions and command enums that ensure type-safe communication between Reactotron clients, plugins, and servers.
 

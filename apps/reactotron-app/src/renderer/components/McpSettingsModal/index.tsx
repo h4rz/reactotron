@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react"
 import styled from "styled-components"
 import { Modal } from "@hurajgor/reactotron-core-ui"
-import { DEFAULT_SERVER_CONFIG, type McpRedactionServerConfig } from "reactotron-mcp"
+import { DEFAULT_SERVER_CONFIG, type McpRedactionServerConfig } from "@hurajgor/reactotron-mcp"
 
 const Section = styled.div`
   margin-top: 16px;

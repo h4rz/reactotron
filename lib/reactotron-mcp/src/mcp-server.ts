@@ -1,7 +1,7 @@
 import { createServer as createHttpServer, type Server as HttpServer } from "http"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
-import type ReactotronServer from "reactotron-core-server"
+import type ReactotronServer from "@hurajgor/reactotron-core-server"
 import type { Command } from "@hurajgor/reactotron-core-contract"
 
 import { registerResources } from "./resources"

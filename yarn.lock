@@ -4684,11 +4684,11 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hurajgor/reactotron-cli@workspace:lib/reactotron-cli"
   dependencies:
+    "@hurajgor/reactotron-core-server": "workspace:*"
+    "@hurajgor/reactotron-mcp": "workspace:*"
     "@types/node": "npm:^18.18.8"
     jest: "npm:^29.7.0"
     jest-environment-node: "npm:^29.7.0"
-    reactotron-core-server: "workspace:*"
-    reactotron-mcp: "workspace:*"
     rimraf: "npm:5.0.5"
     ts-jest: "npm:^29.1.1"
     tsup: "npm:^8.0.0"
@@ -4769,6 +4769,44 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@hurajgor/reactotron-core-server@workspace:*, @hurajgor/reactotron-core-server@workspace:lib/reactotron-core-server":
+  version: 0.0.0-use.local
+  resolution: "@hurajgor/reactotron-core-server@workspace:lib/reactotron-core-server"
+  dependencies:
+    "@babel/core": "npm:^7.23.2"
+    "@babel/plugin-proposal-class-properties": "npm:^7.18.6"
+    "@babel/preset-env": "npm:^7.23.2"
+    "@babel/preset-typescript": "npm:^7.23.2"
+    "@hurajgor/reactotron-core-contract": "npm:0.5.0"
+    "@types/jest": "npm:^29.5.7"
+    "@types/node": "npm:^18.18.8"
+    "@types/ramda": "npm:^0.28.0"
+    "@types/ws": "npm:^8.5.8"
+    "@typescript-eslint/eslint-plugin": "npm:^6.7.5"
+    "@typescript-eslint/parser": "npm:^6.7.5"
+    babel-eslint: "npm:^10.1.0"
+    babel-jest: "npm:^29.7.0"
+    eslint: "npm:^8.53.0"
+    eslint-config-prettier: "npm:^9.0.0"
+    eslint-config-standard: "npm:^17.1.0"
+    eslint-plugin-import: "npm:^2.29.0"
+    eslint-plugin-n: "npm:^16.2.0"
+    eslint-plugin-promise: "npm:^6.1.1"
+    eslint-plugin-standard: "npm:^5.0.0"
+    get-port-please: "npm:^3.1.1"
+    jest: "npm:^29.7.0"
+    jest-environment-node: "npm:^29.7.0"
+    mitt: "npm:^3.0.1"
+    prettier: "npm:^3.0.3"
+    ramda: "npm:0.28.0"
+    react-native-builder-bob: "npm:^0.40.13"
+    rimraf: "npm:5.0.5"
+    ts-jest: "npm:^29.1.1"
+    typescript: "npm:^4.9.5"
+    ws: "npm:^8.14.2"
+  languageName: unknown
+  linkType: soft
+
 "@hurajgor/reactotron-core-ui@workspace:*, @hurajgor/reactotron-core-ui@workspace:lib/reactotron-core-ui":
   version: 0.0.0-use.local
   resolution: "@hurajgor/reactotron-core-ui@workspace:lib/reactotron-core-ui"
@@ -4829,6 +4867,28 @@ __metadata:
     react-motion: ">=0.5.2"
     react-tooltip: ">=4.5.1"
     styled-components: ">=6.0.0"
+  languageName: unknown
+  linkType: soft
+
+"@hurajgor/reactotron-mcp@workspace:*, @hurajgor/reactotron-mcp@workspace:lib/reactotron-mcp":
+  version: 0.0.0-use.local
+  resolution: "@hurajgor/reactotron-mcp@workspace:lib/reactotron-mcp"
+  dependencies:
+    "@hurajgor/reactotron-core-contract": "workspace:*"
+    "@hurajgor/reactotron-core-server": "workspace:*"
+    "@modelcontextprotocol/sdk": "npm:^1.27.0"
+    "@types/node": "npm:^18.18.8"
+    get-port-please: "npm:^3.1.1"
+    jest: "npm:^29.7.0"
+    jest-environment-node: "npm:^29.7.0"
+    rimraf: "npm:5.0.5"
+    ts-jest: "npm:^29.1.1"
+    tsup: "npm:^8.0.0"
+    typescript: "npm:^5.1.3"
+    zod: "npm:^4.3.0"
+  peerDependencies:
+    "@hurajgor/reactotron-core-contract": "*"
+    "@hurajgor/reactotron-core-server": "*"
   languageName: unknown
   linkType: soft
 
@@ -27175,7 +27235,9 @@ __metadata:
     "@expo/serve-sim": "npm:0.4.0"
     "@h4rz/serve-sim-device": "git@github.com:h4rz/serve-sim.git#workspace=@h4rz/serve-sim-device&commit=d6bed84996c162cfcdf2c9c95bf77e0323ac6eae"
     "@hurajgor/reactotron-core-contract": "workspace:*"
+    "@hurajgor/reactotron-core-server": "workspace:*"
     "@hurajgor/reactotron-core-ui": "workspace:*"
+    "@hurajgor/reactotron-mcp": "workspace:*"
     "@storybook/addon-actions": "npm:^5.2.8"
     "@storybook/addon-knobs": "npm:^5.2.8"
     "@storybook/addon-links": "npm:^5.2.8"
@@ -27220,8 +27282,6 @@ __metadata:
     react-router-dom: "npm:^6.18.0"
     react-test-renderer: "npm:18.2.0"
     react-tooltip: "npm:4.5.1"
-    reactotron-core-server: "workspace:*"
-    reactotron-mcp: "workspace:*"
     rimraf: "npm:^5.0.5"
     serve-sim: "npm:0.1.47"
     source-map-support: "npm:^0.5.21"
@@ -27233,66 +27293,6 @@ __metadata:
   dependenciesMeta:
     "@expo/serve-sim":
       optional: true
-  languageName: unknown
-  linkType: soft
-
-"reactotron-core-server@workspace:*, reactotron-core-server@workspace:lib/reactotron-core-server":
-  version: 0.0.0-use.local
-  resolution: "reactotron-core-server@workspace:lib/reactotron-core-server"
-  dependencies:
-    "@babel/core": "npm:^7.23.2"
-    "@babel/plugin-proposal-class-properties": "npm:^7.18.6"
-    "@babel/preset-env": "npm:^7.23.2"
-    "@babel/preset-typescript": "npm:^7.23.2"
-    "@hurajgor/reactotron-core-contract": "workspace:*"
-    "@types/jest": "npm:^29.5.7"
-    "@types/node": "npm:^18.18.8"
-    "@types/ramda": "npm:^0.28.0"
-    "@types/ws": "npm:^8.5.8"
-    "@typescript-eslint/eslint-plugin": "npm:^6.7.5"
-    "@typescript-eslint/parser": "npm:^6.7.5"
-    babel-eslint: "npm:^10.1.0"
-    babel-jest: "npm:^29.7.0"
-    eslint: "npm:^8.53.0"
-    eslint-config-prettier: "npm:^9.0.0"
-    eslint-config-standard: "npm:^17.1.0"
-    eslint-plugin-import: "npm:^2.29.0"
-    eslint-plugin-n: "npm:^16.2.0"
-    eslint-plugin-promise: "npm:^6.1.1"
-    eslint-plugin-standard: "npm:^5.0.0"
-    get-port-please: "npm:^3.1.1"
-    jest: "npm:^29.7.0"
-    jest-environment-node: "npm:^29.7.0"
-    mitt: "npm:^3.0.1"
-    prettier: "npm:^3.0.3"
-    ramda: "npm:0.28.0"
-    react-native-builder-bob: "npm:^0.40.13"
-    rimraf: "npm:5.0.5"
-    ts-jest: "npm:^29.1.1"
-    typescript: "npm:^4.9.5"
-    ws: "npm:^8.14.2"
-  languageName: unknown
-  linkType: soft
-
-"reactotron-mcp@workspace:*, reactotron-mcp@workspace:lib/reactotron-mcp":
-  version: 0.0.0-use.local
-  resolution: "reactotron-mcp@workspace:lib/reactotron-mcp"
-  dependencies:
-    "@hurajgor/reactotron-core-contract": "workspace:*"
-    "@modelcontextprotocol/sdk": "npm:^1.27.0"
-    "@types/node": "npm:^18.18.8"
-    get-port-please: "npm:^3.1.1"
-    jest: "npm:^29.7.0"
-    jest-environment-node: "npm:^29.7.0"
-    reactotron-core-server: "workspace:*"
-    rimraf: "npm:5.0.5"
-    ts-jest: "npm:^29.1.1"
-    tsup: "npm:^8.0.0"
-    typescript: "npm:^5.1.3"
-    zod: "npm:^4.3.0"
-  peerDependencies:
-    "@hurajgor/reactotron-core-contract": "workspace:*"
-    reactotron-core-server: "workspace:*"
   languageName: unknown
   linkType: soft
 

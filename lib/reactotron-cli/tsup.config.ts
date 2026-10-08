@@ -6,9 +6,9 @@ const packageVersion = JSON.parse(
 ).version
 const define = { __PACKAGE_VERSION__: JSON.stringify(packageVersion) }
 
-// reactotron-core-server and reactotron-mcp are not publishable from this fork
-// (unscoped names / private), so the headless server is bundled in. Only ws stays
-// external: it has optional native add-ons that must resolve at runtime.
+// The headless server (core-server and mcp) is bundled in, so the CLI installs
+// with ws alone. ws stays external: it has optional native add-ons that must
+// resolve at runtime.
 const bundle = {
   noExternal: [/^(?!ws$).*/],
   external: ["ws"],

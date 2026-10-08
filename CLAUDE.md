@@ -33,7 +33,7 @@ defaults; the developer's instructions in the moment override anything here.
 - **core-client** — `lib/reactotron-core-client`, the library running **inside** the mobile app.
 - **core-server** — `lib/reactotron-core-server`, the WebSocket server running **inside** the desktop app.
 - **the app** / **desktop app** — `apps/reactotron-app`, the Electron client. Ships as a binary on GitHub releases only; never published to npm.
-- **the fork scope** — `@hurajgor/…`. Only scoped workspaces can be published from this fork; the unscoped names (`reactotron-core-server`, `eslint-plugin-reactotron`, `reactotron-app`) still belong to upstream Infinite Red on npm, so a publish under those names is not ours to make. Scoping a workspace is what makes it publishable here.
+- **the fork scope** — `@hurajgor/…`. Only scoped workspaces can be published from this fork; the unscoped names (`reactotron-core-server`, `reactotron-mcp`, `eslint-plugin-reactotron`, `reactotron-app`) belong to other owners on npm (Infinite Red, or an unrelated project for `reactotron-mcp`), so a publish under those names is not ours to make. Scoping a workspace is what makes it publishable here.
 - **tag** — `<projectName>@<version>`, always **unscoped** (`reactotron-core-client@2.11.5`, never `@hurajgor/…`). Set by `nx.json:19` `tagPrefix: "{projectName}@"`.
 
 ## How the developer works

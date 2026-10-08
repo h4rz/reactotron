@@ -1,13 +1,13 @@
-# reactotron-core-server
+# @hurajgor/reactotron-core-server
 
 This provides the core functionality of the servers allowing it talk to talk to the client.
 
-It is used by [`reactotron-app`](https://github.com/infinitered/reactotron) and `reactotron-cli`.
+It is used by [`reactotron-app`](https://github.com/infinitered/reactotron) and `@hurajgor/reactotron-cli`.
 
 # Usage
 
 ```js
-import { createServer } from "reactotron-core-server"
+import { createServer } from "@hurajgor/reactotron-core-server"
 
 // configure a server
 const server = createServer({

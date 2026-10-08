@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo, useContext } from "react"
 import { ipcRenderer } from "electron"
-import Server, { createServer } from "reactotron-core-server"
+import Server, { createServer } from "@hurajgor/reactotron-core-server"
 import {
   createMcpServer,
   createNodeDeviceHost,
   type ReactotronDesktopHost,
   type ReactotronMcpServer,
   type McpRedactionServerConfig,
-} from "reactotron-mcp"
+} from "@hurajgor/reactotron-mcp"
 import type { McpRedactionConfig } from "@hurajgor/reactotron-core-contract"
 
 import ReactotronBrain from "../../ReactotronBrain"

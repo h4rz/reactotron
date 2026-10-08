@@ -1,14 +1,14 @@
 {
-  "name": "reactotron-core-server",
+  "name": "@hurajgor/reactotron-core-server",
   "version": "3.3.1",
   "description": "Grants Reactotron servers the ability to talk to a Reactotron client.",
   "author": "Infinite Red",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/hurajgor/reactotron/issues"
+    "url": "https://github.com/h4rz/reactotron/issues"
   },
-  "homepage": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-core-server",
-  "repository": "https://github.com/hurajgor/reactotron/tree/master/lib/reactotron-core-server",
+  "homepage": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-core-server",
+  "repository": "https://github.com/h4rz/reactotron/tree/development/lib/reactotron-core-server",
   "files": [
     "dist",
     "src"
@@ -42,7 +42,7 @@
     "prepare": "bob build"
   },
   "dependencies": {
-    "@hurajgor/reactotron-core-contract": "workspace:*",
+    "@hurajgor/reactotron-core-contract": "0.5.0",
     "mitt": "^3.0.1",
     "ramda": "0.28.0",
     "ws": "^8.14.2"

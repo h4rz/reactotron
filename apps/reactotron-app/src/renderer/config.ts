@@ -1,5 +1,5 @@
 import Store from "electron-store"
-import { DEFAULT_REDACTION_RULES, DEFAULT_SERVER_CONFIG } from "reactotron-mcp"
+import { DEFAULT_REDACTION_RULES, DEFAULT_SERVER_CONFIG } from "@hurajgor/reactotron-mcp"
 
 type StoreType = {
   serverPort: number

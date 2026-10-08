@@ -100,4 +100,4 @@ For each package:
 ### Out-of-scope packages
 
 - `reactotron-app` is published as GitHub release artifacts, not to npm.
-- `reactotron-mcp` is private (`"private": true`) and intentionally not on npm. An unrelated `reactotron-mcp` package by `steve228uk` exists on npm — that is his own project and is not affiliated with Infinite Red.
+- The unscoped `reactotron-mcp` on npm is an unrelated project by `steve228uk`; this fork publishes its MCP server as `@hurajgor/reactotron-mcp`.

@@ -4708,7 +4708,7 @@ __metadata:
     "@babel/plugin-proposal-class-properties": "npm:^7.18.6"
     "@babel/preset-env": "npm:^7.23.2"
     "@babel/preset-typescript": "npm:^7.23.2"
-    "@hurajgor/reactotron-core-contract": "npm:0.5.0"
+    "@hurajgor/reactotron-core-contract": "npm:0.6.0"
     "@types/jest": "npm:^29.5.7"
     "@types/node": "npm:^18.18.8"
     "@types/ws": "npm:^8.5.8"
@@ -4735,13 +4735,6 @@ __metadata:
     ws: "npm:^8.14.2"
   languageName: unknown
   linkType: soft
-
-"@hurajgor/reactotron-core-contract@npm:0.5.0":
-  version: 0.5.0
-  resolution: "@hurajgor/reactotron-core-contract@npm:0.5.0"
-  checksum: 10/a32ca81e51170366928d71a1c86cc1b9b770fd9c0b514eac088fe7dd97c9e4c61792496a3feb3745408fb8d50a525eefbe401773baae91626b910a4b426434a9
-  languageName: node
-  linkType: hard
 
 "@hurajgor/reactotron-core-contract@npm:0.6.0, @hurajgor/reactotron-core-contract@workspace:*, @hurajgor/reactotron-core-contract@workspace:lib/reactotron-core-contract":
   version: 0.0.0-use.local
@@ -5052,7 +5045,7 @@ __metadata:
     "@babel/preset-env": "npm:^7.23.2"
     "@babel/preset-typescript": "npm:^7.23.2"
     "@hurajgor/reactotron-core-client": "npm:2.11.5"
-    "@hurajgor/reactotron-core-contract": "npm:0.5.0"
+    "@hurajgor/reactotron-core-contract": "npm:0.6.0"
     "@react-native-async-storage/async-storage": "npm:^1.19.4"
     "@types/jest": "npm:^29.5.7"
     "@types/node": "npm:^18.18.8"

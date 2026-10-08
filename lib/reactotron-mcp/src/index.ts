@@ -15,3 +15,5 @@ export {
   getClientRedactionConfig,
 } from "./redaction"
 export type { McpRedactionServerConfig, Redactor } from "./redaction"
+export { createNodeDeviceHost } from "./device-host"
+export type { DeviceHost, DeviceInfo, DevicePlatform, DeviceResult } from "./device-host"

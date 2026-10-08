@@ -8,6 +8,8 @@ import { registerResources } from "./resources"
 import { registerTools } from "./tools"
 import { DEFAULT_SERVER_CONFIG, type McpRedactionServerConfig } from "./redaction"
 import type { ReactotronDesktopHost } from "./desktop-host"
+import type { DeviceHost } from "./device-host"
+import { registerDeviceTools } from "./device-tools"
 
 export interface ReactotronMcpServer {
   start(port?: number): Promise<void>
@@ -23,7 +25,8 @@ export interface ReactotronMcpServer {
 export function createMcpServer(
   reactotronServer: ReactotronServer,
   redactionConfig?: Partial<McpRedactionServerConfig>,
-  desktopHost?: ReactotronDesktopHost
+  desktopHost?: ReactotronDesktopHost,
+  deviceHost?: DeviceHost
 ): ReactotronMcpServer {
   let serverRedactionConfig: McpRedactionServerConfig = {
     ...DEFAULT_SERVER_CONFIG,
@@ -65,6 +68,7 @@ export function createMcpServer(
     )
     registerResources(mcp, reactotronServer, commandBuffer, serverRedactionConfig)
     registerTools(mcp, reactotronServer, commandBuffer, serverRedactionConfig, desktopHost)
+    if (deviceHost) registerDeviceTools(mcp, deviceHost)
     return mcp
   }
 

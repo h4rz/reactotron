@@ -10,6 +10,7 @@ import { DEFAULT_SERVER_CONFIG, type McpRedactionServerConfig } from "./redactio
 import type { ReactotronDesktopHost } from "./desktop-host"
 import type { DeviceHost } from "./device-host"
 import { registerDeviceTools } from "./device-tools"
+import { createFlowRecorder, instrumentTools, registerFlowTools, type ToolHandler } from "./flows"
 
 export interface ReactotronMcpServer {
   start(port?: number): Promise<void>
@@ -41,6 +42,8 @@ export function createMcpServer(
   const commandBuffer: Command[] = []
   const BUFFER_SIZE = 500
   let commandListener: ((command: Command) => void) | null = null
+  // Shared across the per-request McpServer instances so a recording spans calls.
+  const flowRecorder = createFlowRecorder()
 
   function startBuffering() {
     commandListener = (command: Command) => {
@@ -66,9 +69,12 @@ export function createMcpServer(
       { name: "reactotron", version: "0.1.0" },
       { capabilities: { resources: {}, tools: {} } }
     )
+    const handlers = new Map<string, ToolHandler>()
+    instrumentTools(mcp, handlers, flowRecorder)
     registerResources(mcp, reactotronServer, commandBuffer, serverRedactionConfig)
     registerTools(mcp, reactotronServer, commandBuffer, serverRedactionConfig, desktopHost)
     if (deviceHost) registerDeviceTools(mcp, deviceHost)
+    registerFlowTools(mcp, handlers, flowRecorder, commandBuffer)
     return mcp
   }
 

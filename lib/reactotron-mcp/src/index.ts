@@ -17,3 +17,5 @@ export {
 export type { McpRedactionServerConfig, Redactor } from "./redaction"
 export { createNodeDeviceHost } from "./device-host"
 export type { DeviceHost, DeviceInfo, DevicePlatform, DeviceResult } from "./device-host"
+export { createFlowRecorder, runFlow } from "./flows"
+export type { Flow, FlowStep } from "./flows"

@@ -2,6 +2,13 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+### [5.3.8](https://github.com/hurajgor/reactotron/compare/reactotron-react-native@5.3.7...reactotron-react-native@5.3.8) (2026-10-08)
+
+
+### Bug Fixes
+
+* **react-native:** skip context providers in UI snapshots ([9af51b4](https://github.com/hurajgor/reactotron/commit/9af51b4f847d838221189266674bad5d0e756963))
+
 ### [5.3.7](https://github.com/hurajgor/reactotron/compare/reactotron-react-native@5.3.6...reactotron-react-native@5.3.7) (2026-09-25)
 
 

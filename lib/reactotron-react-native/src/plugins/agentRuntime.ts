@@ -210,13 +210,31 @@ function generatedIdForProps(type: unknown, props: Record<string, any>) {
   return id
 }
 
+const CONTEXT_TYPES = ["react.provider", "react.context", "react.consumer"].map((name) => Symbol.for(name))
+
+/** Context providers and consumers carry app objects in `value`, not UI. */
+function isContextType(type: unknown) {
+  return Boolean(type && typeof type === "object" && CONTEXT_TYPES.includes((type as any).$$typeof))
+}
+
+/** Only an input's text, number or toggle state; objects can throw when serialized. */
+function valueFromProps(props: Record<string, any>) {
+  const value = props.value
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+    ? value
+    : undefined
+}
+
 function nodeFromProps(type: unknown, props: Record<string, any>): AgentUiNode | null {
+  if (isContextType(type)) return null
+
   const testID = typeof props.testID === "string" && props.testID.length > 0 ? props.testID : undefined
   const text = textFromChildren(props.children)
   const label = labelFromProps(props)
   const role = roleFromProps(props)
   const hint = hintFromProps(props)
   const placeholder = placeholderFromProps(props)
+  const value = valueFromProps(props)
 
   if (
     !testID &&
@@ -225,7 +243,7 @@ function nodeFromProps(type: unknown, props: Record<string, any>): AgentUiNode |
     !role &&
     !hint &&
     !placeholder &&
-    props.value == null &&
+    value === undefined &&
     !hasPressHandler(props) &&
     !hasFillHandler(props)
   ) {
@@ -243,7 +261,7 @@ function nodeFromProps(type: unknown, props: Record<string, any>): AgentUiNode |
     placeholder,
     visible: visibleFromProps(props),
     enabled: enabledFromProps(props),
-    value: props.value,
+    value,
   }
 }
 

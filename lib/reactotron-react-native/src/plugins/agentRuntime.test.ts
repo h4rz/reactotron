@@ -84,6 +84,35 @@ describe("agentRuntime", () => {
     )
   })
 
+  test("skips context providers whose value throws when serialized", async () => {
+    // React Navigation's default context value: every getter throws.
+    const throwing = Object.defineProperty({}, "navigation", {
+      enumerable: true,
+      get: () => {
+        throw new Error("Couldn't find a navigation context.")
+      },
+    })
+    const NavigationContext = React.createContext(throwing)
+    const { plugin, sent } = createPlugin()
+
+    React.createElement(NavigationContext.Provider, { value: throwing, children: "Dashboard" })
+    React.createElement("TextInput", { testID: "context-safe-input", value: throwing })
+    React.createElement("TextInput", { testID: "context-safe-amount", value: "42" })
+
+    plugin.onCommand?.({
+      type: "agent.ui.snapshot.request",
+      payload: { requestId: "snapshot-context" },
+    } as any)
+    await flush()
+
+    expect(sent[0].payload.status).toBe("success")
+    expect(() => JSON.stringify(sent[0].payload)).not.toThrow()
+    const nodes = sent[0].payload.snapshot.nodes
+    expect(nodes).not.toEqual(expect.arrayContaining([expect.objectContaining({ text: "Dashboard" })]))
+    expect(nodes.find((node: any) => node.testID === "context-safe-input").value).toBeUndefined()
+    expect(nodes.find((node: any) => node.testID === "context-safe-amount").value).toBe("42")
+  })
+
   test("falls back to captured elements when a devtools renderer rejects fiber access", async () => {
     const originalHook = (globalThis as any).__REACT_DEVTOOLS_GLOBAL_HOOK__
     ;(globalThis as any).__REACT_DEVTOOLS_GLOBAL_HOOK__ = {

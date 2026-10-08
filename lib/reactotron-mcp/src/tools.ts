@@ -195,7 +195,7 @@ export function registerTools(
   mcp.registerTool("request_state", {
     description: [
       "Request a fresh state snapshot from the connected app.",
-      "Requires Redux or MST plugin configured in the app.",
+      "Requires Redux, MST or MobX plugin configured in the app.",
       "IMPORTANT: Always specify a path to avoid oversized responses.",
       "The full state tree can be millions of characters.",
       "Use request_state_keys first to explore the state shape, then request specific slices.",
@@ -229,7 +229,7 @@ export function registerTools(
         }
       }
     }
-    return textResult({ status: "no_response", message: "The app did not respond to the state request. It likely doesn't have a state management plugin (Redux or MST) configured in Reactotron." })
+    return textResult({ status: "no_response", message: "The app did not respond to the state request. It likely doesn't have a state management plugin (Redux, MST or MobX) configured in Reactotron." })
   })
 
   mcp.registerTool("request_state_keys", {
@@ -266,13 +266,13 @@ export function registerTools(
         }
       }
     }
-    return textResult({ status: "no_response", message: "The app did not respond to the keys request. It likely doesn't have a state management plugin (Redux or MST) configured in Reactotron." })
+    return textResult({ status: "no_response", message: "The app did not respond to the keys request. It likely doesn't have a state management plugin (Redux, MST or MobX) configured in Reactotron." })
   })
 
   mcp.registerTool("swap_state", {
     description: [
       "Replace the entire app state tree. WARNING: this is destructive and cannot be undone.",
-      "Requires the Reactotron state plugin (Redux or MST).",
+      "Requires the Reactotron state plugin (Redux, MST or MobX).",
       "Use request_state first to get the current state, modify it, then swap.",
     ].join(" "),
     inputSchema: {
@@ -679,7 +679,7 @@ export function registerTools(
     description: [
       "Subscribe to a state path. The app will send state.values.change events whenever the value at this path changes.",
       "Read the state/subscriptions resource to see changes.",
-      "Requires Redux or MST plugin. Example path: 'user.profile.name'",
+      "Requires Redux, MST or MobX plugin. Example path: 'user.profile.name'",
     ].join(" "),
     inputSchema: {
       path: z.string().describe("Dot-separated state path to subscribe to, e.g. 'user.profile' or 'cart.items'"),

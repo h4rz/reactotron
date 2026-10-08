@@ -2,6 +2,19 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [0.6.0](https://github.com/hurajgor/reactotron/compare/reactotron-core-contract@0.5.0...reactotron-core-contract@0.6.0) (2026-10-08)
+
+
+### Features
+
+* **core-server:** add a host option to choose the listening interface ([e9c8510](https://github.com/hurajgor/reactotron/commit/e9c8510c120af67dbf7507c8169b6d6642eed046))
+* scope core-server and mcp under hurajgor ([1cc59b7](https://github.com/hurajgor/reactotron/commit/1cc59b71c7121c6eefa2e3160acc2c000b0e74a7))
+
+
+### Bug Fixes
+
+* **release:** migrate scoped package links to h4rz ([e0ed625](https://github.com/hurajgor/reactotron/commit/e0ed6259e592cde2550ab110f213409ccbd2ed1d))
+
 ## [0.5.0](https://github.com/infinitered/reactotron/compare/@hurajgor/reactotron-core-contract@0.4.0...@hurajgor/reactotron-core-contract@0.5.0) (2026-07-14)
 
 ### Features

@@ -2,6 +2,14 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [3.17.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.16.0...reactotron-app@3.17.0) (2026-10-08)
+
+
+### Features
+
+* **app:** expose device tools on the desktop MCP server ([da46018](https://github.com/hurajgor/reactotron/commit/da46018bef7f7b7dfa3d9ec70586cb72b080c05a))
+* scope core-server and mcp under hurajgor ([1cc59b7](https://github.com/hurajgor/reactotron/commit/1cc59b71c7121c6eefa2e3160acc2c000b0e74a7))
+
 ## [3.16.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.15.0...reactotron-app@3.16.0) (2026-10-01)
 
 

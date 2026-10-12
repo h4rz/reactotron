@@ -25,6 +25,8 @@ jobs:
 
       - run: corepack enable
       - run: npm install --global npm@11.5.1
+      # The app pins a git dependency by SSH URL; the runner has no SSH key, so fetch it over HTTPS.
+      - run: git config --global url."https://github.com/".insteadOf "git@github.com:"
       - run: corepack yarn install --immutable
       - run: corepack yarn build
       - run: corepack yarn package:validate

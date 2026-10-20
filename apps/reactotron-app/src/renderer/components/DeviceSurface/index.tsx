@@ -1023,6 +1023,10 @@ function useIOSAvccStream(
     let timestamp = 0
     let attempts = 0
     let awaitingKeyframe = true
+    // serve-sim's seed is its cached JPEG, which only refreshes while an MJPEG
+    // client is attached. Once the decoder has painted, a reconnect must keep that
+    // live frame rather than repaint a seed that can be days old.
+    let hasDecodedFrame = false
     const controller = new AbortController()
     const avccUrl = streamUrl.replace(/stream\.mjpeg(?:\?.*)?$/, "stream.avcc")
 
@@ -1051,6 +1055,7 @@ function useIOSAvccStream(
           try {
             offerFrame(sourceLimit, frame)
             paint(frame, frame.displayWidth, frame.displayHeight)
+            hasDecodedFrame = true
           } finally {
             frame.close()
           }
@@ -1093,6 +1098,7 @@ function useIOSAvccStream(
           if (done || disposed) break
           for (const chunk of parser.push(value)) {
             if (chunk.type === "seed") {
+              if (hasDecodedFrame) continue
               let bitmap: ImageBitmap | undefined
               try {
                 bitmap = await createImageBitmap(new Blob([chunk.payload], { type: "image/jpeg" }))

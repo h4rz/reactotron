@@ -2,6 +2,18 @@
 
 This file was generated using [@jscutlery/semver](https://github.com/jscutlery/semver).
 
+## [3.18.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.17.0...reactotron-app@3.18.0) (2026-10-22)
+
+
+### Features
+
+* **app:** add a mute toggle for the iOS simulator ([111e328](https://github.com/hurajgor/reactotron/commit/111e328d07d20d537ada4b4382899b1089d84daa))
+
+
+### Bug Fixes
+
+* **app:** keep the live simulator frame across stream reconnects ([69499e8](https://github.com/hurajgor/reactotron/commit/69499e8b2a61d870cb6df84061c8ecb43ee29ea7))
+
 ## [3.17.0](https://github.com/hurajgor/reactotron/compare/reactotron-app@3.16.0...reactotron-app@3.17.0) (2026-10-08)
 
 

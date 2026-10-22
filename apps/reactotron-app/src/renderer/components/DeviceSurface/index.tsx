@@ -139,6 +139,15 @@ const PREVIEW_RETRY_DELAY = 1000
 const PREVIEW_RETRY_LIMIT = 4
 const IOS_DECODE_QUEUE_LIMIT = 8
 const IOS_FRAME_DURATION_MICROSECONDS = 16_667
+// iOS has 16 volume steps and no readable level, so mute presses volume-down
+// through all of them and unmute restores half. Presses closer than ~50ms drop.
+const IOS_VOLUME_STEPS = 16
+const IOS_UNMUTE_VOLUME_STEPS = 8
+const IOS_VOLUME_PRESS_INTERVAL = 60
+const IOS_VOLUME_BUTTONS = {
+  "volume-up": { button: "volume-up", page: 12, usage: 233 },
+  "volume-down": { button: "volume-down", page: 12, usage: 234 },
+} as const
 const supportsIOSSimulator = isIOSSimulatorSupported(window.process.platform)
 const DEVICE_3D_STORAGE_KEY = "reactotron.deviceHub.render3d"
 
@@ -1385,6 +1394,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   const autoOpenAttemptedRef = useRef(false)
   const controlSocketRef = useRef<WebSocket | null>(null)
   const keyboardTimersRef = useRef<number[]>([])
+  const volumeTimersRef = useRef<number[]>([])
+  const [mutedSimulators, setMutedSimulators] = useState<Record<string, boolean>>({})
   const touchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
   const androidTouchRef = useRef<{
     pointerId: number
@@ -2326,6 +2337,8 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
   useEffect(() => {
     keyboardTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     keyboardTimersRef.current = []
+    volumeTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    volumeTimersRef.current = []
     setIsControlConnected(false)
     if (!activeWsUrl) {
       controlSocketRef.current = null
@@ -2509,6 +2522,31 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
     },
     [sendControl]
   )
+
+  const isSimulatorMuted = activeUdid ? Boolean(mutedSimulators[activeUdid]) : false
+  const toggleSimulatorMute = useCallback(() => {
+    if (!activeUdid) return
+    const mute = !mutedSimulators[activeUdid]
+    const button = IOS_VOLUME_BUTTONS[mute ? "volume-down" : "volume-up"]
+    const presses = mute ? IOS_VOLUME_STEPS : IOS_UNMUTE_VOLUME_STEPS
+    volumeTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    volumeTimersRef.current = []
+    if (!sendControl(4, button)) {
+      setStatus("Simulator controls are not connected.")
+      setIsError(true)
+      return
+    }
+    for (let press = 1; press < presses; press += 1) {
+      const timer = window.setTimeout(() => {
+        volumeTimersRef.current = volumeTimersRef.current.filter((id) => id !== timer)
+        sendControl(4, button)
+      }, press * IOS_VOLUME_PRESS_INTERVAL)
+      volumeTimersRef.current.push(timer)
+    }
+    setMutedSimulators((current) => ({ ...current, [activeUdid]: mute }))
+    setStatus(mute ? "Simulator muted." : "Simulator unmuted.")
+    setIsError(false)
+  }, [activeUdid, mutedSimulators, sendControl])
 
   const screenPoint = (event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -2992,6 +3030,16 @@ function DeviceSurface({ isOpen }: { isOpen: boolean }) {
                     onClick={() => toggleAppearance().catch(() => undefined)}
                   >
                     <FiMoon size={18} />
+                  </RailButton>
+                  <RailButton
+                    type="button"
+                    aria-label={isSimulatorMuted ? "Unmute simulator" : "Mute simulator"}
+                    title={isSimulatorMuted ? "Unmute simulator" : "Mute simulator"}
+                    aria-pressed={isSimulatorMuted}
+                    disabled={!isControlConnected}
+                    onClick={toggleSimulatorMute}
+                  >
+                    {isSimulatorMuted ? <FiVolumeX size={18} /> : <FiVolume2 size={18} />}
                   </RailButton>
                   <RailDivider />
                   <RailButton
